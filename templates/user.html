@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LifeLink - Report Emergency</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="topbar">
+        <a href="/" class="back-btn">← Back</a>
+        <span>Report Accident</span>
+    </div>
+
+    <div class="container">
+        <!-- Step 1: Fill form -->
+        <div id="step-form" class="card">
+            <h2>Report an Emergency</h2>
+            <input type="text" id="reporter-name" placeholder="Your name" class="input">
+            <input type="text" id="location" placeholder="Location (e.g. Chabahil Chowk)" class="input">
+
+            <label class="label">Severity</label>
+            <select id="severity" class="input">
+                <option value="critical">Critical</option>
+                <option value="moderate">Moderate</option>
+                <option value="mild">Mild</option>
+            </select>
+
+            <label class="label">Type of injury</label>
+            <select id="injury-type" class="input">
+                <option value="Head trauma">Head trauma</option>
+                <option value="Bone fracture">Bone fracture</option>
+                <option value="Burns">Burns</option>
+                <option value="Internal bleeding">Internal bleeding</option>
+                <option value="Spinal injury">Spinal injury</option>
+                <option value="Unknown">Unknown</option>
+            </select>
+
+            <button onclick="submitEmergency()" class="btn btn-red btn-full">
+                Send Emergency Alert
+            </button>
+        </div>
+
+        <!-- Step 2: After submission -->
+        <div id="step-status" class="card" style="display:none">
+                <div class="success-icon">Success</div>
+            <h2>Alert Sent!</h2>
+            <p id="ambulance-info" class="info-text">Ambulance assigned</p>
+
+            <div class="status-steps">
+                <div class="step done">Emergency reported</div>
+                <div class="step done" id="step-ambulance">Ambulance assigned</div>
+                <div class="step active" id="step-hospital">Finding best hospital</div>
+                <div class="step" id="step-arrival">Estimated arrival: ~6 min</div>
+            </div>
+
+            <a href="/" class="btn btn-outline btn-full" style="margin-top:1rem">Back to Home</a>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
+
+

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LifeLink - Emergency Response System</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">LifeLink</div>
+            <div class="nav-role-indicator">
+                <span id="current-role" class="role-badge">Home</span>
+            </div>
+            <button id="menu-toggle" class="menu-toggle">☰</button>
+        </div>
+        <div id="nav-menu" class="nav-menu">
+            <button class="nav-btn" onclick="switchRole('home')">Home</button>
+            <button class="nav-btn" onclick="switchRole('user')">Report Emergency</button>
+            <button class="nav-btn" onclick="switchRole('driver')">Ambulance Driver</button>
+                <button class="nav-btn" onclick="switchRole('hospital')">Hospital System</button>
+        </div>
+    </nav>
+
+    <!-- Hero Section (Home) -->
+    <div id="home-page" class="page-section active">
+        <div class="hero">
+            <div class="live-badge">● LIVE SYSTEM</div>
+            <h1>LifeLink</h1>
+            <p>Connecting accident victims, ambulances & hospitals in real time</p>
+            <small>Emergency Response System for Nepal</small>
+        </div>
+
+        <div class="container">
+            <p class="choose-text">Choose your role to get started</p>
+
+            <div class="role-grid">
+                <button class="role-card" onclick="switchRole('user')">
+                    <div class="role-icon">Report</div>
+                    <h3>Report Accident</h3>
+                    <p>I found an accident</p>
+                </button>
+
+                <button class="role-card" onclick="switchRole('driver')">
+                    <div class="role-icon">Driver</div>
+                    <h3>Ambulance Driver</h3>
+                    <p>View active alerts</p>
+                </button>
+
+                <button class="role-card" onclick="switchRole('hospital')">
+                    <div class="role-icon">System</div>
+                    <h3>Hospital System</h3>
+                    <p>Update capacity</p>
+                </button>
+            </div>
+
+            <div class="stats-card">
+                <h3>Today's Impact</h3>
+                <div class="stats-grid">
+                    <div class="stat">
+                        <div class="stat-number">12</div>
+                        <div class="stat-label">Emergencies handled</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-number">4.2 min</div>
+                        <div class="stat-label">Avg response time</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-number">5</div>
+                        <div class="stat-label">Hospitals connected</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Emergency Page (User) -->
+    <div id="user-page" class="page-section">
+        <div class="topbar">
+            <button class="back-btn" onclick="switchRole('home')">← Home</button>
+                <span>Report Accident</span>
+        </div>
+
+        <div class="container">
+            <!-- Step 1: Fill form -->
+            <div id="step-form" class="card">
+                <h2>Report an Emergency</h2>
+                <p class="info-text">Quickly provide details so we can dispatch help immediately.</p>
+                
+                <input type="text" id="reporter-name" placeholder="Your full name" class="input">
+                <input type="text" id="location" placeholder="Location (e.g., Chabahil Chowk)" class="input">
+
+                <label class="label">Severity Level</label>
+                <select id="severity" class="input">
+                    <option value="critical">Critical - Life threatening</option>
+                    <option value="moderate">Moderate - Serious but stable</option>
+                    <option value="mild">Mild - Minor injuries</option>
+                </select>
+
+                <label class="label">Type of Injury</label>
+                <select id="injury-type" class="input">
+                    <option value="Head trauma">Head trauma</option>
+                    <option value="Bone fracture">Bone fracture</option>
+                    <option value="Burns">Burns</option>
+                    <option value="Internal bleeding">Internal bleeding</option>
+                    <option value="Spinal injury">Spinal injury</option>
+                    <option value="Chest injury">Chest injury</option>
+                    <option value="Unknown">Unknown</option>
+                </select>
+
+                <button onclick="submitEmergency()" class="btn btn-red btn-full">
+                    Send Emergency Alert
+                </button>
+            </div>
+
+            <!-- Step 2: After submission -->
+            <div id="step-status" class="card" style="display:none">
+                <div class="success-icon">Success</div>
+                <h2>Alert Sent Successfully!</h2>
+                <p id="ambulance-info" class="info-text success-msg">Ambulance assigned and en route</p>
+
+                <div class="status-steps">
+                    <div class="step done">Emergency reported</div>
+                    <div class="step done">Ambulance assigned</div>
+                    <div class="step active">Routing to hospital</div>
+                    <div class="step">Estimated arrival: ~6 min</div>
+                </div>
+
+                <p class="muted" style="text-align: center; margin-top: 1rem;">Emergency ID: <strong id="emergency-id">--</strong></p>
+
+                <button onclick="switchRole('home')" class="btn btn-outline btn-full" style="margin-top:1rem">
+                    Back to Home
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Driver Dashboard -->
+    <div id="driver-page" class="page-section">
+        <div class="topbar">
+            <button class="back-btn" onclick="switchRole('home')">← Home</button>
+            <span>Driver Dashboard</span>
+        </div>
+
+        <div class="container">
+            <div class="driver-header">
+                <div>
+                    <strong id="driver-name">Ram Bahadur Thapa</strong>
+                    <p id="driver-vehicle">BA 1 JA 4521</p>
+                </div>
+                <span id="driver-status" class="badge badge-green">Available</span>
+            </div>
+
+            <div class="section-title">Active Emergency Alerts</div>
+            <div id="alerts-list">
+                <p class="muted">Loading active alerts...</p>
+            </div>
+
+            <div id="route-panel" style="display:none"></div>
+
+            <!-- Hospital suggestions (shown after accepting) -->
+            <div id="hospital-suggestions" style="display:none">
+                <div class="section-title">Hospital recommendations</div>
+                <p class="info-text">These hospitals are recommended based on the emergency severity and patient needs.</p>
+                <div id="hospitals-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hospital Dashboard -->
+    <div id="hospital-page" class="page-section">
+        <div class="topbar">
+            <button class="back-btn" onclick="switchRole('home')">← Home</button>
+            <span>Hospital System</span>
+        </div>
+
+        <div class="container">
+            <div class="card">
+                <h2>Update Hospital Capacity</h2>
+                <p class="info-text">Keep the system updated with current capacity to help ambulances route patients correctly.</p>
+
+                <label class="label">Select Hospital</label>
+                <select id="hospital-select" class="input" onchange="loadHospitalData()">
+                    <option value="">-- Select Your Hospital --</option>
+                </select>
+
+                <div class="form-section">
+                    <label class="label">General Beds Available</label>
+                    <input type="number" id="inp-beds" class="input" placeholder="e.g. 45" min="0">
+                </div>
+
+                <div class="form-section">
+                    <label class="label">ICU Beds Available</label>
+                    <input type="number" id="inp-icu" class="input" placeholder="e.g. 8" min="0">
+                </div>
+
+                <div class="form-section">
+                    <label class="label">Doctors on Duty</label>
+                    <input type="number" id="inp-docs" class="input" placeholder="e.g. 22" min="0">
+                </div>
+
+                <label class="label">Available Facilities</label>
+                <div class="checkbox-group">
+                    <label><input type="checkbox" id="chk-trauma"> Trauma Bay</label>
+                    <label><input type="checkbox" id="chk-neuro"> Neurosurgeon</label>
+                    <label><input type="checkbox" id="chk-burn"> Burn Unit</label>
+                    <label><input type="checkbox" id="chk-blood"> Blood Bank</label>
+                </div>
+
+                <button onclick="saveHospital()" class="btn btn-green btn-full">
+                    Save and broadcast
+                </button>
+                <div id="save-msg" class="success-msg" style="display:none">
+                    Updated. Ambulances can now see your status.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

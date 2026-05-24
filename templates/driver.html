@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LifeLink - Driver Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="topbar">
+        <a href="/" class="back-btn">← Back</a>
+        <span>Driver Dashboard</span>
+    </div>
+
+    <div class="container">
+        <div class="driver-header">
+            <div>
+                <strong>Ram Bahadur Thapa</strong>
+                <p>BA 1 JA 4521</p>
+            </div>
+            <span class="badge badge-green">Available</span>
+        </div>
+
+        <h3>Active Alerts</h3>
+        <div id="alerts-list">
+            <p class="muted">Loading alerts...</p>
+        </div>
+
+        <div id="route-panel" style="display:none"></div>
+
+        <!-- Hospital suggestions (shown after accepting) -->
+        <div id="hospital-suggestions" style="display:none">
+            <h3>Hospital recommendations</h3>
+            <div id="hospitals-list"></div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        loadAlerts();
+        setInterval(loadAlerts, 10000); // refresh every 10 seconds
+    </script>
+</body>
+</html>

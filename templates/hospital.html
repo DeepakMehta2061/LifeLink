@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LifeLink - Hospital Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="topbar">
+        <a href="/" class="back-btn">← Back</a>
+        <span>Hospital System</span>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h2>Update Your Capacity</h2>
+
+            <label class="label">Select Hospital</label>
+            <select id="hospital-select" class="input" onchange="loadHospitalData()">
+                <option value="">-- Select Hospital --</option>
+            </select>
+
+            <label class="label">General Beds Available</label>
+            <input type="number" id="inp-beds" class="input" placeholder="e.g. 45">
+
+            <label class="label">ICU Beds Available</label>
+            <input type="number" id="inp-icu" class="input" placeholder="e.g. 8">
+
+            <label class="label">Doctors on Duty</label>
+            <input type="number" id="inp-docs" class="input" placeholder="e.g. 22">
+
+            <label class="label">Facilities</label>
+            <div class="checkbox-group">
+                <label><input type="checkbox" id="chk-trauma"> Trauma Bay</label>
+                <label><input type="checkbox" id="chk-neuro"> Neurosurgeon on call</label>
+                <label><input type="checkbox" id="chk-burn"> Burn Unit</label>
+                <label><input type="checkbox" id="chk-blood"> Blood Bank</label>
+            </div>
+
+            <button onclick="saveHospital()" class="btn btn-green btn-full">
+                Save and broadcast to system
+            </button>
+            <div id="save-msg" class="success-msg" style="display:none">
+                Saved. Ambulances can now see your status.
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        loadHospitals();
+    </script>
+</body>
+</html>
