@@ -18,3 +18,4 @@ env/
 
 # System files
 .DS_Store
+.db

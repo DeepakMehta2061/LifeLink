@@ -12,7 +12,21 @@
     <!-- Navigation Bar -->
     <nav class="navbar">
         <div class="nav-container">
-            <div class="nav-logo">LifeLink</div>
+            <div class="nav-logo">
+                <!-- LifeLink SVG Logo -->
+                <svg height="80" viewBox="0 0 680 340" xmlns="http://www.w3.org/2000/svg" aria-label="LifeLink">
+                    <circle cx="168" cy="148" r="90" fill="none" stroke="#1D9E75" stroke-width="4" opacity="0.18"/>
+                    <circle cx="168" cy="148" r="72" fill="none" stroke="#1D9E75" stroke-width="2.5" opacity="0.12"/>
+                    <path fill="#E24B4A" d="M168,210 C140,188 90,162 90,122 C90,100 108,84 128,84 C144,84 158,94 168,106 C178,94 192,84 208,84 C228,84 246,100 246,122 C246,162 196,188 168,210 Z"/>
+                    <polyline fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" points="108,140 126,140 136,116 148,166 158,128 168,140 188,140 198,140 210,140 228,140"/>
+                    <rect x="200" y="228" width="30" height="16" rx="8" fill="#1D9E75"/>
+                    <rect x="149" y="228" width="30" height="16" rx="8" fill="#1D9E75" opacity="0.55"/>
+                    <rect x="167" y="228" width="30" height="16" rx="8" fill="#1D9E75"/>
+                    <text x="298" y="162" font-family="system-ui, sans-serif" font-size="52" font-weight="500" fill="#E24B4A">Life</text>
+                    <text x="390" y="162" font-family="system-ui, sans-serif" font-size="52" font-weight="500" fill="#1D9E75">Link</text>
+                    <line x1="272" y1="100" x2="272" y2="220" stroke="#D3D1C7" stroke-width="1"/>
+                </svg>
+            </div>
             <div class="nav-role-indicator">
                 <span id="current-role" class="role-badge">Home</span>
             </div>
@@ -22,7 +36,7 @@
             <button class="nav-btn" onclick="switchRole('home')">Home</button>
             <button class="nav-btn" onclick="switchRole('user')">Report Emergency</button>
             <button class="nav-btn" onclick="switchRole('driver')">Ambulance Driver</button>
-                <button class="nav-btn" onclick="switchRole('hospital')">Hospital System</button>
+            <button class="nav-btn" onclick="switchRole('hospital')">Hospital System</button>
         </div>
     </nav>
 
@@ -30,8 +44,7 @@
     <div id="home-page" class="page-section active">
         <div class="hero">
             <div class="live-badge">● LIVE SYSTEM</div>
-            <h1>LifeLink</h1>
-            <p>Connecting accident victims, ambulances & hospitals in real time</p>
+            <p>Connecting accident victims, ambulances &amp; hospitals in real time</p>
             <small>Emergency Response System for Nepal</small>
         </div>
 
@@ -82,7 +95,7 @@
     <div id="user-page" class="page-section">
         <div class="topbar">
             <button class="back-btn" onclick="switchRole('home')">← Home</button>
-                <span>Report Accident</span>
+            <span>Report Accident</span>
         </div>
 
         <div class="container">
@@ -90,7 +103,7 @@
             <div id="step-form" class="card">
                 <h2>Report an Emergency</h2>
                 <p class="info-text">Quickly provide details so we can dispatch help immediately.</p>
-                
+
                 <input type="text" id="reporter-name" placeholder="Your full name" class="input">
                 <input type="text" id="location" placeholder="Location (e.g., Chabahil Chowk)" class="input">
 

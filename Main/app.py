@@ -113,8 +113,7 @@ def submit_emergency():
         """, (ambulance_id,))
 
         conn.commit()
-
-        return jsonify({
+        result = jsonify({
             'success': True,
             'emergency_id': emergency_id,
             'ambulance': {
@@ -124,16 +123,21 @@ def submit_emergency():
             }
         })
 
+        cur.close()
+        conn.close()
+        return result
+
     else:
         conn.commit()
-
-        return jsonify({
+        result = jsonify({
             'success': False,
             'message': 'No ambulance available right now'
         })
 
-    cur.close()
-    conn.close()
+        cur.close()
+        conn.close()
+        return result
+    
     
     # USER: Check status of their emergency
 @app.route('/api/emergency/<int:emergency_id>', methods=['GET'])
@@ -202,7 +206,7 @@ def get_alerts():
 @app.route('/api/accept/<int:emergency_id>', methods=['POST'])
 def accept_emergency(emergency_id):
     data = request.json
-    ambulance_id = data['ambulance_id']
+    ambulance_id = data.get('ambulance_id') if isinstance(data, dict) else None
 
     conn = get_connection()
     cur = conn.cursor()
@@ -219,6 +223,17 @@ def accept_emergency(emergency_id):
     injury_type = emergency_row[2] if emergency_row else ''
 
     # Update emergency status
+    # If ambulance_id not provided by the client, auto-select a free ambulance
+    if not ambulance_id:
+        cur.execute("SELECT id FROM ambulances WHERE status = 'free' LIMIT 1")
+        amb_row = cur.fetchone()
+        if amb_row:
+            ambulance_id = amb_row[0]
+        else:
+            cur.close()
+            conn.close()
+            return jsonify({'success': False, 'message': 'No ambulance available'})
+
     cur.execute("""
         UPDATE emergencies
         SET status = 'ambulance_assigned', ambulance_id = %s
