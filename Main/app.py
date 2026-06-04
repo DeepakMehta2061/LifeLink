@@ -1,6 +1,17 @@
 from flask import Flask, render_template, request, jsonify
 from database import get_connection
-from ai_features import detect_severity, generate_emergency_summary
+from ai_features import (
+    calculate_emergency_risk_score,
+    detect_injury_category,
+    detect_severity,
+    estimate_ambulance_eta,
+    explain_hospital_match,
+    generate_driver_alert_message,
+    generate_emergency_summary,
+    generate_first_aid_checklist,
+    get_hospital_capacity_status,
+    suggest_route_decision,
+)
 import os
 
 basedir = os.path.dirname(os.path.abspath(__file__))
@@ -426,6 +437,43 @@ def suggest_hospital():
     conn.close()
 
     return jsonify(hospitals)
+
+
+# NEW FEATURE ADDED
+@app.route('/api/ai/emergency-insights', methods=['POST'])
+def emergency_ai_insights():
+    data = request.json or {}
+    injury_text = data.get('injury_type') or data.get('description') or ''
+    combined_text = f"{data.get('severity', '')} {injury_text}"
+    detected_severity = detect_severity(combined_text)
+    distance_km = get_float_value(data, 'distance_km')
+
+    return jsonify({
+        'detected_severity': detected_severity,
+        'injury_category': detect_injury_category(injury_text),
+        'risk_score': calculate_emergency_risk_score(data),
+        'eta_minutes': estimate_ambulance_eta(distance_km) if distance_km is not None else None,
+        'summary': generate_emergency_summary(data),
+        'driver_alert': generate_driver_alert_message(data),
+        'route_decision': suggest_route_decision(data),
+        'first_aid_checklist': generate_first_aid_checklist(injury_text)
+    })
+
+
+# NEW FEATURE ADDED
+@app.route('/api/ai/hospital-insights', methods=['POST'])
+def hospital_ai_insights():
+    data = request.json or {}
+    hospitals = data.get('hospitals', [])
+
+    enhanced_hospitals = []
+    for hospital in hospitals:
+        hospital_data = dict(hospital)
+        hospital_data['match_explanation'] = explain_hospital_match(hospital_data)
+        hospital_data['capacity_status'] = get_hospital_capacity_status(hospital_data)
+        enhanced_hospitals.append(hospital_data)
+
+    return jsonify(enhanced_hospitals)
 
 # HOSPITAL: Get all hospitals
 @app.route('/api/hospitals', methods=['GET'])
