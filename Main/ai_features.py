@@ -28,6 +28,49 @@ def detect_severity(text):
 
 
 # NEW FEATURE ADDED
+def explain_severity_detection(text, severity=None):
+    emergency_text = (text or '').lower()
+    detected_severity = severity or detect_severity(emergency_text)
+    severity_reasons = {
+        'critical': ['bleeding', 'unconscious', 'not breathing', 'accident severe'],
+        'moderate': ['fracture', 'pain', 'injury'],
+        'mild': ['small injury', 'minor pain'],
+    }
+
+    matched_keywords = [
+        keyword
+        for keyword in severity_reasons.get(detected_severity, [])
+        if keyword in emergency_text
+    ]
+
+    if matched_keywords:
+        return f"Marked {detected_severity} because the report mentions {', '.join(matched_keywords)}."
+    return f"Marked {detected_severity} from the selected emergency details."
+
+
+# NEW FEATURE ADDED
+def get_triage_confidence(text, severity=None):
+    emergency_text = (text or '').lower()
+    detected_severity = severity or detect_severity(emergency_text)
+    keyword_groups = {
+        'critical': ['bleeding', 'unconscious', 'not breathing', 'accident severe'],
+        'moderate': ['fracture', 'pain', 'injury'],
+        'mild': ['small injury', 'minor pain'],
+    }
+    matches = sum(
+        1
+        for keyword in keyword_groups.get(detected_severity, [])
+        if keyword in emergency_text
+    )
+
+    if matches >= 2:
+        return 'high'
+    if matches == 1:
+        return 'medium'
+    return 'low'
+
+
+# NEW FEATURE ADDED
 def generate_emergency_summary(emergency_data):
     emergency_data = emergency_data or {}
     severity = emergency_data.get('severity', 'Moderate')
@@ -83,6 +126,22 @@ def calculate_emergency_risk_score(emergency_data):
 
 
 # NEW FEATURE ADDED
+def get_priority_label(risk_score):
+    try:
+        score = int(risk_score)
+    except (TypeError, ValueError):
+        score = 50
+
+    if score >= 80:
+        return 'Immediate dispatch'
+    if score >= 55:
+        return 'High priority'
+    if score >= 30:
+        return 'Monitor closely'
+    return 'Low priority'
+
+
+# NEW FEATURE ADDED
 def estimate_ambulance_eta(distance_km, average_speed_kmph=30):
     try:
         distance = float(distance_km)
@@ -134,6 +193,20 @@ def explain_hospital_match(hospital):
     if not reasons:
         return 'Recommended as the closest available hospital record.'
     return 'Recommended because it has ' + ', '.join(reasons) + '.'
+
+
+# NEW FEATURE ADDED
+def calculate_hospital_score(hospital):
+    hospital = hospital or {}
+    score = (
+        ((hospital.get('available_beds', 0) or 0) * 2) +
+        ((hospital.get('icu_available', 0) or 0) * 5) +
+        ((hospital.get('doctors_available', 0) or 0) * 3)
+    )
+
+    if hospital.get('has_trauma'):
+        score += 10
+    return score
 
 
 # NEW FEATURE ADDED

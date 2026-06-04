@@ -601,9 +601,63 @@ body {
 
 /* NEW FEATURE ADDED */
 .ai-panel-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
     font-weight: 700;
     color: #17496b;
     margin-bottom: 0.75rem;
+}
+
+/* NEW FEATURE ADDED */
+.ai-mini-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.35rem;
+}
+
+/* NEW FEATURE ADDED */
+.ai-confidence {
+    border-radius: 999px;
+    padding: 0.25rem 0.55rem;
+    font-size: 11px;
+    text-transform: uppercase;
+}
+
+/* NEW FEATURE ADDED */
+.confidence-high {
+    background: #e9f8ee;
+    color: #2d6a1a;
+}
+
+/* NEW FEATURE ADDED */
+.confidence-medium {
+    background: #fff8df;
+    color: #9a6a00;
+}
+
+/* NEW FEATURE ADDED */
+.confidence-low {
+    background: #f4f6f8;
+    color: #607080;
+}
+
+/* NEW FEATURE ADDED */
+.risk-border-high {
+    border-left: 5px solid #8B0000;
+}
+
+/* NEW FEATURE ADDED */
+.risk-border-medium {
+    border-left: 5px solid #9a6a00;
+}
+
+/* NEW FEATURE ADDED */
+.risk-border-low {
+    border-left: 5px solid #2d6a1a;
 }
 
 /* NEW FEATURE ADDED */
@@ -650,11 +704,91 @@ body {
 }
 
 /* NEW FEATURE ADDED */
+.ai-understood {
+    background: white;
+    border: 1px solid #e1edf5;
+    border-radius: 6px;
+    padding: 0.65rem;
+    margin-bottom: 0.75rem;
+}
+
+/* NEW FEATURE ADDED */
 .ai-checklist {
-    margin-top: 0.75rem;
+    margin-top: 0.5rem;
     padding-left: 1.25rem;
     font-size: 13px;
     color: #4b5b66;
+}
+
+/* NEW FEATURE ADDED */
+.first-aid-box {
+    margin-top: 0.75rem;
+    background: white;
+    border: 1px solid #e1edf5;
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-size: 13px;
+}
+
+/* NEW FEATURE ADDED */
+.voice-understanding {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+/* NEW FEATURE ADDED */
+.voice-understanding span {
+    background: #f7fbff;
+    border: 1px solid #d8e4ef;
+    border-radius: 999px;
+    padding: 0.25rem 0.5rem;
+    font-size: 12px;
+}
+
+/* NEW FEATURE ADDED */
+.voice-understanding-reason {
+    margin-top: 0.5rem;
+    color: #607080;
+    font-size: 12px;
+}
+
+/* NEW FEATURE ADDED */
+.hospital-ai-reason {
+    background: #f8fff6;
+    border-color: #d8e8d2;
+}
+
+/* NEW FEATURE ADDED */
+.reporter-tracking-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid #d8e4ef;
+    border-radius: 10px;
+    background: #f7fbff;
+}
+
+/* NEW FEATURE ADDED */
+.reporter-tracking-card p {
+    color: #607080;
+    font-size: 13px;
+    margin-top: 0.25rem;
+}
+
+/* NEW FEATURE ADDED */
+.tracker-eta {
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: #8B0000;
+    color: white;
+    padding: 0.45rem 0.7rem;
+    font-weight: 700;
+    font-size: 13px;
 }
 
 /* NEW FEATURE ADDED */

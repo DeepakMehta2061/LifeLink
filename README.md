@@ -1,95 +1,119 @@
 # LifeLink
 
-LifeLink is a Flask and PostgreSQL emergency response system that connects three important groups in one workflow:
+LifeLink is an AI-assisted emergency coordination platform for connecting accident reporters, ambulance drivers, and hospitals in one fast response workflow.
 
-- People reporting an emergency
-- Ambulance drivers receiving and accepting alerts
-- Hospitals updating capacity and availability
+## Hackathon Pitch
 
-The goal is to reduce manual coordination during emergencies by helping route reports, ambulances, and hospital recommendations through one simple web app.
+During an emergency, people lose time explaining the situation, finding an ambulance, and checking which hospital can accept the patient. LifeLink reduces that delay by turning a spoken emergency report into structured triage information, assigning ambulance support, recommending hospitals, and showing live route guidance.
 
-## Core Modules
+> LifeLink helps emergency teams understand, prioritize, dispatch, and route faster.
 
-### 1. Emergency Reporting
+## Main Users
 
-Users can submit an emergency report with their name, location, severity, and injury type. The system stores the emergency and assigns an available ambulance when possible.
+- **Reporter:** speaks or submits an emergency report and receives AI first-aid guidance.
+- **Ambulance Driver:** receives prioritized emergency alerts with AI risk score and live route tracking.
+- **Hospital:** updates capacity so ambulances can route patients to hospitals with beds, ICU, doctors, and trauma support.
 
-### 2. Ambulance Driver Alerts
+## AI-Assisted Features
 
-Drivers can view pending emergency alerts, accept a case, and move the case through the response flow.
+### AI Voice Reporting
 
-### 3. Hospital Capacity Updates
+The reporter can click `Speak Emergency` and describe the incident naturally.
 
-Hospitals can update available beds, ICU capacity, doctor availability, and special facilities such as trauma support, neurosurgeon support, burn unit, and blood bank.
+Example:
 
-## Added AI-Like Features
+```text
+There is an accident near Chabahil Chowk. One person is unconscious and bleeding.
+```
 
-These features are rule-based and do not require model training.
+LifeLink then:
 
-### Emergency Severity Detection
+- shows the recognized speech transcript
+- detects severity
+- detects injury category
+- fills emergency form fields
+- generates AI triage guidance
 
-Function: `detect_severity(text)`
+### AI Triage Decision Panel
 
-Detects emergency severity from text:
+The reporter and driver can see:
 
-- `critical`: bleeding, unconscious, not breathing, severe accident
-- `moderate`: fracture, pain, injury
-- `mild`: small injury, minor pain
+- detected severity
+- injury category
+- risk score
+- priority label
+- confidence label
+- reason for severity detection
+- first-aid checklist
+- route advice
 
-### Smart Nearest Ambulance Selection
+### Smart Ambulance Selection
 
-The `/api/emergency` route now supports nearest ambulance selection when coordinates are available.
+The `/api/emergency` route selects the nearest free ambulance when coordinates are available.
 
-- Uses simple Euclidean distance with latitude and longitude
-- Supports `lat/lng` or `latitude/longitude`
-- Falls back to the original first-free ambulance behavior if coordinates are missing
-- Keeps the existing API response structure unchanged
+- Uses Euclidean distance
+- Supports `lat/lng` and `latitude/longitude`
+- Falls back to first available ambulance when coordinates are unavailable
 
-### Hospital Scoring System
+### Live Ambulance Route Tracking
 
-The `/api/suggest-hospital` route now ranks hospitals using a scoring formula:
+The driver route panel uses browser geolocation to:
+
+- show the ambulance marker
+- update driver position
+- refresh route line
+- show route distance and ETA
+- open Google Maps directions
+
+### Hospital Recommendation Scoring
+
+Hospitals are ranked using:
 
 ```text
 score = (available_beds * 2) + (icu_available * 5) + (doctors_available * 3)
 ```
 
-Trauma support adds a bonus:
+Trauma support adds:
 
 ```text
 +10 if has_trauma is true
 ```
 
-Hospitals are returned sorted by score in descending order.
+The UI also explains why each hospital was recommended.
 
-### Emergency Summary Generator
+## Demo Flow
 
-Function: `generate_emergency_summary(emergency_data)`
+1. Open LifeLink and choose `Report Emergency`.
+2. Click `Speak Emergency`.
+3. Say: `There is an accident near Chabahil Chowk. One person is unconscious and bleeding.`
+4. Watch LifeLink auto-fill details and show the AI triage panel.
+5. Submit the emergency.
+6. Open `Ambulance Driver`.
+7. View AI priority, risk score, and reason.
+8. Accept the case.
+9. View live route tracking and hospital recommendations with AI explanations.
 
-Creates a short summary such as:
+## Core Modules
 
-```text
-Critical emergency at Main Road, injury type bleeding. Ambulance assigned.
-```
+### Emergency Reporting
 
-### Additional Helper-Only AI Features
+Users report an emergency with name, location, severity, and injury type. AI voice reporting and triage guidance make the report faster and clearer.
 
-The project also includes helper functions for future integration:
+### Ambulance Driver Dashboard
 
-- `detect_injury_category(text)`: detects burn, fracture, cardiac, breathing, trauma, neurological, or general cases
-- `calculate_emergency_risk_score(emergency_data)`: returns a 0-100 rule-based risk score
-- `estimate_ambulance_eta(distance_km, average_speed_kmph=30)`: estimates ETA in minutes
-- `is_possible_duplicate_emergency(new_emergency, existing_emergencies)`: checks for duplicate reports
-- `explain_hospital_match(hospital)`: explains why a hospital was recommended
-- `get_hospital_capacity_status(hospital)`: labels hospital capacity as `low`, `medium`, or `good`
-- `generate_driver_alert_message(emergency_data)`: creates a driver-friendly alert message
-- `suggest_route_decision(emergency_data)`: suggests whether to go directly to hospital or reach patient first
-- `generate_first_aid_checklist(injury_type)`: returns basic first-aid checklist steps
+Drivers view emergency alerts, AI priority, risk score, route advice, hospital recommendations, and live route tracking.
+
+### Hospital Capacity Dashboard
+
+Hospitals update beds, ICU availability, doctors, trauma support, neurosurgeon support, burn unit, and blood bank status.
 
 ## Tech Stack
 
 - Backend: Python, Flask
 - Database: PostgreSQL
 - Frontend: HTML, CSS, JavaScript
+- Maps: Leaflet, OpenStreetMap, OSRM routing
+- Voice Input: Browser SpeechRecognition API
 - Database Driver: psycopg2
 - Environment Variables: python-dotenv
 
@@ -115,7 +139,7 @@ LifeLink/
 
 ## Environment Variables
 
-Create or update `Main/.env` with your PostgreSQL settings:
+Create or update `Main/.env`:
 
 ```env
 DB_HOST=localhost
@@ -126,14 +150,12 @@ DB_PASSWORD=your_database_password
 
 ## Run The Project
 
-From the project root:
-
 ```bash
 cd Main
 python3 app.py
 ```
 
-Then open the Flask URL shown in the terminal, usually:
+Open:
 
 ```text
 http://127.0.0.1:5000
@@ -141,19 +163,13 @@ http://127.0.0.1:5000
 
 ## Validation
 
-The backend files can be checked with:
-
 ```bash
 python3 -m py_compile Main/app.py Main/ai_features.py
+node --check static/script.js
 ```
 
-## Safety Notes
+## Notes
 
-The added AI-like features were implemented with backward compatibility in mind:
-
-- No existing routes were removed
-- No frontend files were changed
-- No database tables were renamed
-- No database schema changes were required
-- Existing API response structures were preserved
-- New helper functions are available for future integration
+- Voice reporting works best in Chrome or Edge.
+- Browser location permission is required for live route tracking.
+- Current AI features are rule-based and demo-friendly, with no model training required.

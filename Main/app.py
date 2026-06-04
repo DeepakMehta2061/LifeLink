@@ -2,14 +2,18 @@ from flask import Flask, render_template, request, jsonify
 from database import get_connection
 from ai_features import (
     calculate_emergency_risk_score,
+    calculate_hospital_score,
     detect_injury_category,
     detect_severity,
     estimate_ambulance_eta,
     explain_hospital_match,
+    explain_severity_detection,
     generate_driver_alert_message,
     generate_emergency_summary,
     generate_first_aid_checklist,
     get_hospital_capacity_status,
+    get_priority_label,
+    get_triage_confidence,
     suggest_route_decision,
 )
 import os
@@ -446,12 +450,20 @@ def emergency_ai_insights():
     injury_text = data.get('injury_type') or data.get('description') or ''
     combined_text = f"{data.get('severity', '')} {injury_text}"
     detected_severity = detect_severity(combined_text)
+    risk_score = calculate_emergency_risk_score({
+        **data,
+        'severity': detected_severity,
+        'injury_type': injury_text,
+    })
     distance_km = get_float_value(data, 'distance_km')
 
     return jsonify({
         'detected_severity': detected_severity,
         'injury_category': detect_injury_category(injury_text),
-        'risk_score': calculate_emergency_risk_score(data),
+        'risk_score': risk_score,
+        'priority_label': get_priority_label(risk_score),
+        'triage_confidence': get_triage_confidence(combined_text, detected_severity),
+        'severity_reason': explain_severity_detection(combined_text, detected_severity),
         'eta_minutes': estimate_ambulance_eta(distance_km) if distance_km is not None else None,
         'summary': generate_emergency_summary(data),
         'driver_alert': generate_driver_alert_message(data),
@@ -469,6 +481,7 @@ def hospital_ai_insights():
     enhanced_hospitals = []
     for hospital in hospitals:
         hospital_data = dict(hospital)
+        hospital_data['ai_score'] = calculate_hospital_score(hospital_data)
         hospital_data['match_explanation'] = explain_hospital_match(hospital_data)
         hospital_data['capacity_status'] = get_hospital_capacity_status(hospital_data)
         enhanced_hospitals.append(hospital_data)

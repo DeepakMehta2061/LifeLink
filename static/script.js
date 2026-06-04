@@ -79,11 +79,17 @@ async function fetchHospitalAiInsights(hospitals) {
 
 // NEW FEATURE ADDED
 function getEmergencyFormData() {
+    const transcriptBox = document.getElementById('voice-transcript');
+    const transcriptText = transcriptBox ? transcriptBox.dataset.rawTranscript : '';
+    const injuryText = transcriptText
+        ? transcriptText
+        : (document.getElementById('injury-type') ? document.getElementById('injury-type').value : '');
+
     return {
         reporter_name: document.getElementById('reporter-name') ? document.getElementById('reporter-name').value : '',
         location_name: document.getElementById('location') ? document.getElementById('location').value : '',
         severity: document.getElementById('severity') ? document.getElementById('severity').value : 'moderate',
-        injury_type: document.getElementById('injury-type') ? document.getElementById('injury-type').value : ''
+        injury_type: injuryText
     };
 }
 
@@ -102,21 +108,40 @@ function renderEmergencyAiPanel(container, insights, title) {
         ? insights.first_aid_checklist.map(item => `<li>${escapeHtml(item)}</li>`).join('')
         : '';
     const riskClass = getRiskClass(insights.risk_score || 0);
+    const confidence = insights.triage_confidence || 'low';
+    const priorityLabel = insights.priority_label || 'Monitor closely';
 
     container.style.display = 'block';
     container.innerHTML = `
-        <div class="ai-panel">
-            <div class="ai-panel-title">${escapeHtml(title || 'AI assistance')}</div>
+        <div class="ai-panel risk-border-${riskClass}">
+            <div class="ai-panel-title">
+                <span>${escapeHtml(title || 'AI assistance')}</span>
+                <span class="ai-confidence confidence-${escapeHtml(confidence)}">${escapeHtml(confidence)} confidence</span>
+            </div>
+            <p class="ai-summary ai-understood"><strong>AI understood this as:</strong> ${escapeHtml(insights.summary)}</p>
             <div class="ai-grid">
                 <div><strong>Detected severity</strong><span>${escapeHtml(insights.detected_severity)}</span></div>
                 <div><strong>Injury category</strong><span>${escapeHtml(insights.injury_category)}</span></div>
                 <div><strong>Risk score</strong><span class="risk-${riskClass}">${escapeHtml(insights.risk_score)}/100</span></div>
+                <div><strong>Priority</strong><span class="risk-${riskClass}">${escapeHtml(priorityLabel)}</span></div>
             </div>
-            <p class="ai-summary">${escapeHtml(insights.summary)}</p>
+            <p class="ai-summary"><strong>Why:</strong> ${escapeHtml(insights.severity_reason)}</p>
             <p class="ai-summary"><strong>Route advice:</strong> ${escapeHtml(insights.route_decision)}</p>
-            ${checklist ? `<ul class="ai-checklist">${checklist}</ul>` : ''}
+            ${checklist ? `<div class="first-aid-box"><strong>First-aid guidance while waiting:</strong><ul class="ai-checklist">${checklist}</ul></div>` : ''}
         </div>
     `;
+}
+
+// NEW FEATURE ADDED
+function updateReporterTracking(insights) {
+    const eta = document.getElementById('reporter-eta');
+    const trackingCard = document.getElementById('reporter-tracking-card');
+    if (!eta || !trackingCard || !insights) return;
+
+    const riskScore = Number(insights.risk_score || 0);
+    const estimatedEta = riskScore >= 80 ? '~4 min' : (riskScore >= 55 ? '~6 min' : '~8 min');
+    eta.textContent = `ETA ${estimatedEta}`;
+    trackingCard.className = `reporter-tracking-card risk-border-${getRiskClass(riskScore)}`;
 }
 
 // NEW FEATURE ADDED
@@ -150,6 +175,25 @@ function setVoiceReportStatus(message, transcript) {
         transcriptBox.style.display = 'block';
         transcriptBox.textContent = transcript;
     }
+}
+
+// NEW FEATURE ADDED
+function renderVoiceUnderstanding(transcript, insights) {
+    const transcriptBox = document.getElementById('voice-transcript');
+    if (!transcriptBox || !insights) return;
+
+    const riskClass = getRiskClass(insights.risk_score || 0);
+    transcriptBox.dataset.rawTranscript = transcript;
+    transcriptBox.style.display = 'block';
+    transcriptBox.innerHTML = `
+        <strong>Recognized speech:</strong> ${escapeHtml(transcript)}
+        <div class="voice-understanding">
+            <span>Severity: ${escapeHtml(insights.detected_severity)}</span>
+            <span>Category: ${escapeHtml(insights.injury_category)}</span>
+            <span class="risk-${riskClass}">Risk: ${escapeHtml(insights.risk_score)}/100</span>
+        </div>
+        <div class="voice-understanding-reason">${escapeHtml(insights.severity_reason)}</div>
+    `;
 }
 
 // NEW FEATURE ADDED
@@ -227,6 +271,7 @@ function applyVoiceReportToForm(transcript) {
         description: emergencyText
     }).then(insights => {
         setSelectValue('severity', insights.detected_severity || 'moderate');
+        renderVoiceUnderstanding(emergencyText, insights);
         updateEmergencyAiPreview();
     }).catch(error => {
         console.error('Error applying voice insights:', error);
@@ -436,6 +481,7 @@ async function submitEmergency() {
             try {
                 const insights = await fetchEmergencyAiInsights(emergencyData);
                 renderEmergencyAiPanel(document.getElementById('submitted-ai-insights'), insights, 'AI response guidance');
+                updateReporterTracking(insights);
             } catch (insightError) {
                 console.error('Error loading submitted AI insights:', insightError);
             }
@@ -503,10 +549,13 @@ async function loadAlerts() {
                     <p class="alert-info"><strong>Injury:</strong> ${alert.injury_type}</p>
                     <p class="alert-info"><strong>Reported by:</strong> ${alert.reporter_name}</p>
                     ${insight ? `
-                        <div class="ai-mini">
-                            <strong>AI risk:</strong> <span class="risk-${riskClass}">${insight.risk_score}/100</span>
-                            &nbsp;|&nbsp; ${escapeHtml(insight.injury_category)}
-                            <br><span>${escapeHtml(insight.driver_alert)}</span>
+                        <div class="ai-mini risk-border-${riskClass}">
+                            <div class="ai-mini-title">
+                                <strong>AI priority:</strong>
+                                <span class="risk-${riskClass}">${escapeHtml(insight.priority_label)} (${insight.risk_score}/100)</span>
+                            </div>
+                            <div>${escapeHtml(insight.driver_alert)}</div>
+                            <div><strong>Why:</strong> ${escapeHtml(insight.severity_reason)}</div>
                         </div>
                     ` : ''}
                     <div class="alert-buttons">
@@ -663,9 +712,13 @@ async function loadHospitalSuggestions(severity, injuryType) {
                     ${h.has_blood_bank ? 'Blood bank available' : 'No blood bank'}
                 </div>
                 ${h.match_explanation ? `
-                    <div class="ai-mini">
-                        <strong>AI explanation:</strong> ${escapeHtml(h.match_explanation)}
-                        <br><strong>Capacity status:</strong> <span class="capacity-${escapeHtml(h.capacity_status)}">${escapeHtml(h.capacity_status)}</span>
+                    <div class="ai-mini hospital-ai-reason">
+                        <div class="ai-mini-title">
+                            <strong>AI hospital score:</strong>
+                            <span>${escapeHtml(h.ai_score)}</span>
+                        </div>
+                        <div>${escapeHtml(h.match_explanation)}</div>
+                        <div><strong>Capacity status:</strong> <span class="capacity-${escapeHtml(h.capacity_status)}">${escapeHtml(h.capacity_status)}</span></div>
                     </div>
                 ` : ''}
             </div>
