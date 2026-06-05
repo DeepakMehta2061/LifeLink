@@ -3,6 +3,28 @@ let currentHospitalRecommendations = [];
 let routeMap = null;
 let voiceRecognition = null;
 let isVoiceListening = false;
+let lastTrackingPost = 0;
+let currentUserRole = localStorage.getItem('lifelink_user_role') || null;
+let currentUserName = localStorage.getItem('lifelink_user_name') || '';
+const roleLabels = {
+    'home': 'Home',
+    'user': 'Client',
+    'police': 'Admin',
+    'admin': 'Admin',
+    'driver': 'Driver',
+    'hospital': 'Admin',
+    'login': 'Login'
+};
+const roleStartPages = {
+    user: 'user',
+    admin: 'admin',
+    driver: 'driver'
+};
+const roleAccess = {
+    user: ['home', 'user'],
+    admin: ['home', 'admin', 'police', 'hospital'],
+    driver: ['home', 'driver']
+};
 let routeMapState = {
     driverLocation: null,
     destinationLocation: null,
@@ -387,36 +409,117 @@ function renderRoutePanel() {
     `;
 }
 
-// PAGE SWITCHING LOGIC 
-function switchRole(role) {
-    // Hide all pages
+function setActivePage(role) {
     document.querySelectorAll('.page-section').forEach(page => {
         page.classList.remove('active');
     });
 
-    // Show selected page
     const selectedPage = document.getElementById(role + '-page');
     if (selectedPage) {
         selectedPage.classList.add('active');
     }
+}
 
-    // Update role indicator
-    const roleLabels = {
-        'home': 'Home',
-        'user': 'Reporter',
-        'driver': 'Driver',
-        'hospital': 'Hospital'
-    };
-    document.getElementById('current-role').textContent = roleLabels[role] || role;
+function updateLoginUi(activePage) {
+    const roleBadge = document.getElementById('current-role');
+    const logoutButton = document.getElementById('logout-btn');
+    const navMenu = document.getElementById('nav-menu');
 
-    // Load data if needed
-    if (role === 'driver') {
-        loadAlerts();
-    } else if (role === 'hospital') {
-        loadHospitals();
+    document.body.classList.toggle('auth-screen-active', !currentUserRole);
+
+    if (roleBadge) {
+        if (currentUserRole) {
+            roleBadge.textContent = `${roleLabels[currentUserRole]}${currentUserName ? ': ' + currentUserName : ''}`;
+        } else {
+            roleBadge.textContent = roleLabels[activePage] || 'Login';
+        }
     }
 
-    // Close mobile menu
+    if (logoutButton) {
+        logoutButton.style.display = currentUserRole ? 'inline-flex' : 'none';
+    }
+
+    if (navMenu) {
+        navMenu.querySelectorAll('.nav-btn').forEach(button => {
+            const match = button.getAttribute('onclick') || '';
+            const roleMatch = match.match(/switchRole\('([^']+)'\)/);
+            const targetRole = roleMatch ? roleMatch[1] : '';
+            const isAllowed = canAccessRole(targetRole);
+            button.disabled = !isAllowed;
+            button.classList.toggle('locked', !isAllowed);
+        });
+    }
+
+    document.querySelectorAll('.role-card').forEach(button => {
+        const match = button.getAttribute('onclick') || '';
+        const roleMatch = match.match(/switchRole\('([^']+)'\)/);
+        const targetRole = roleMatch ? roleMatch[1] : '';
+        const isAllowed = canAccessRole(targetRole);
+        button.disabled = !isAllowed;
+        button.classList.toggle('locked', !isAllowed);
+    });
+}
+
+function canAccessRole(role) {
+    if (role === 'login') return true;
+    if (!currentUserRole) return false;
+    return (roleAccess[currentUserRole] || []).includes(role);
+}
+
+function loadRoleData(role) {
+    if (role === 'driver') {
+        loadAlerts();
+    } else if (role === 'police') {
+        loadPoliceNotifications();
+    } else if (role === 'admin') {
+        loadAdminReports();
+        loadAdminAllReports();
+    } else if (role === 'hospital') {
+        loadHospitals();
+        loadHospitalNotifications();
+    }
+}
+
+function loginAs(role) {
+    const nameInput = document.getElementById('login-name');
+    currentUserRole = role;
+    currentUserName = nameInput && nameInput.value.trim() ? nameInput.value.trim() : `${roleLabels[role]} Demo`;
+    localStorage.setItem('lifelink_user_role', currentUserRole);
+    localStorage.setItem('lifelink_user_name', currentUserName);
+    switchRole(roleStartPages[role] || 'home');
+}
+
+function logoutUser() {
+    currentUserRole = null;
+    currentUserName = '';
+    localStorage.removeItem('lifelink_user_role');
+    localStorage.removeItem('lifelink_user_name');
+    setActivePage('login');
+    updateLoginUi('login');
+
+    const navMenu = document.getElementById('nav-menu');
+    if (navMenu) {
+        navMenu.classList.remove('active');
+    }
+}
+
+// PAGE SWITCHING LOGIC
+function switchRole(role) {
+    if (!canAccessRole(role)) {
+        if (!currentUserRole) {
+            alert('Please login first.');
+            setActivePage('login');
+            updateLoginUi('login');
+            return;
+        }
+        alert(`Access denied. You are logged in as ${roleLabels[currentUserRole]}.`);
+        return;
+    }
+
+    setActivePage(role);
+    updateLoginUi(role);
+    loadRoleData(role);
+
     const navMenu = document.getElementById('nav-menu');
     if (navMenu) {
         navMenu.classList.remove('active');
@@ -445,6 +548,77 @@ function validateEmergencyForm() {
         return false;
     }
     return true;
+}
+
+async function submitWorkflowEmergency() {
+    if (!validateEmergencyForm()) return;
+
+    const transcriptBox = document.getElementById('voice-transcript');
+    const transcript = transcriptBox ? (transcriptBox.dataset.rawTranscript || '') : '';
+    const emergencyData = {
+        ...getEmergencyFormData(),
+        voice_text: transcript,
+        description: transcript || (document.getElementById('injury-type') ? document.getElementById('injury-type').value : ''),
+        report_source: transcript ? 'voice' : 'form'
+    };
+
+    try {
+        const reporterLocation = await getDriverLocation();
+        if (reporterLocation) {
+            emergencyData.reporter_lat = reporterLocation.lat;
+            emergencyData.reporter_lng = reporterLocation.lng;
+        }
+
+        const response = await fetch('/api/workflow/report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(emergencyData)
+        });
+
+        const data = await response.json();
+        if (!data.success) {
+            throw new Error(data.message || 'Unable to submit verified workflow report');
+        }
+
+        document.getElementById('step-form').style.display = 'none';
+        document.getElementById('step-status').style.display = 'block';
+        document.getElementById('emergency-id').textContent = data.emergency_id;
+        const cctvText = data.police_alert_created
+            ? `CCTV matched: ${data.cctv_match.zone_name}. Waiting for police confirmation.`
+            : 'No nearby mock CCTV zone matched. Report sent to admin verification.';
+        document.getElementById('ambulance-info').textContent =
+            cctvText;
+
+        const statusSteps = document.querySelector('#step-status .status-steps');
+        if (statusSteps) {
+            statusSteps.innerHTML = `
+                <div class="step done">Emergency reported</div>
+                <div class="step done">AI analysis completed</div>
+                <div class="step done">${data.police_alert_created ? 'CCTV zone matched' : 'Location checked'}</div>
+                <div class="step active">${data.police_alert_created ? 'Waiting for police CCTV confirmation' : 'Waiting for admin verification'}</div>
+                <div class="step">Ambulance dispatch pending</div>
+            `;
+        }
+
+        if (data.ai_analysis) {
+            renderEmergencyAiPanel(document.getElementById('submitted-ai-insights'), {
+                detected_severity: data.ai_analysis.severity,
+                injury_category: data.ai_analysis.injury_category,
+                risk_score: data.ai_analysis.risk_score,
+                priority_label: data.ai_analysis.severity === 'critical' ? 'Immediate dispatch' : 'High priority',
+                triage_confidence: data.ai_analysis.confidence_score >= 80 ? 'high' : 'medium',
+                severity_reason: `Detected keywords: ${data.ai_analysis.keywords.join(', ') || 'selected report details'}.`,
+                route_decision: data.police_alert_created ? 'Police CCTV confirmation required before dispatch.' : 'Admin verification required before dispatch.',
+                summary: `${data.ai_analysis.emergency_type} marked ${data.ai_analysis.severity}.`,
+                first_aid_checklist: data.ai_analysis.medical_requirements
+            }, 'AI emergency analysis');
+        }
+
+        await loadEmergencyTimeline(data.emergency_id);
+    } catch (error) {
+        console.error('Workflow submit error:', error);
+        alert('Error sending report for admin verification. Please try again.');
+    }
 }
 
 async function submitEmergency() {
@@ -491,6 +665,317 @@ async function submitEmergency() {
     } catch (error) {
         console.error('Error:', error);
         alert('Error submitting emergency. Please try again.');
+    }
+}
+
+async function loadEmergencyTimeline(emergencyId) {
+    const panel = document.getElementById('emergency-timeline-panel');
+    if (!panel || !emergencyId) return;
+
+    try {
+        const response = await fetch(`/api/emergency/${emergencyId}/timeline`);
+        const timeline = await response.json();
+
+        if (!Array.isArray(timeline) || timeline.length === 0) {
+            panel.style.display = 'none';
+            return;
+        }
+
+        panel.style.display = 'block';
+        panel.innerHTML = `
+            <h3>Emergency Timeline</h3>
+            ${timeline.map(item => `
+                <div class="timeline-item">
+                    <strong>${escapeHtml(item.event_label)}</strong>
+                    <span>${escapeHtml(item.details || '')}</span>
+                </div>
+            `).join('')}
+        `;
+    } catch (error) {
+        console.error('Error loading timeline:', error);
+    }
+}
+
+async function loadAdminReports() {
+    const container = document.getElementById('admin-reports-list');
+    if (!container) return;
+
+    try {
+        const response = await fetch('/api/admin/reports');
+        const reports = await response.json();
+
+        if (!Array.isArray(reports) || reports.length === 0) {
+            container.innerHTML = '<div class="muted">No reports waiting for admin review.</div>';
+            return;
+        }
+
+        container.innerHTML = reports.map(report => {
+            const severityClass = report.severity === 'critical' ? 'red' : (report.severity === 'moderate' ? 'yellow' : 'green');
+            return `
+                <div class="admin-report-card" data-emergency-id="${report.id}">
+                    <div class="alert-title">
+                        <strong>${escapeHtml(report.ai_emergency_type || 'Emergency Report')}</strong>
+                        <span class="badge badge-${severityClass}">${escapeHtml(report.severity)}</span>
+                    </div>
+                    <p class="alert-info"><strong>Reporter:</strong> ${escapeHtml(report.reporter_name)}</p>
+                    <p class="alert-info"><strong>Location:</strong> ${escapeHtml(report.location_name)}</p>
+                    <p class="alert-info"><strong>Patient status:</strong> ${escapeHtml(report.injury_type)}</p>
+                    <div class="ai-mini">
+                        <div class="ai-mini-title">
+                            <strong>AI confidence:</strong>
+                            <span>${escapeHtml(report.ai_confidence || 0)}%</span>
+                        </div>
+                        <div><strong>Keywords:</strong> ${escapeHtml(report.ai_keywords || 'No keyword match')}</div>
+                        <div><strong>Medical needs:</strong> ${escapeHtml(report.possible_medical_requirements || 'Emergency bed')}</div>
+                    </div>
+                    <textarea class="input admin-note" rows="2" placeholder="Admin note or request details"></textarea>
+                    <div class="admin-actions">
+                        <button class="btn btn-green" onclick="adminReviewReport(${report.id}, 'verify')">Verify</button>
+                        <button class="btn btn-outline" onclick="adminReviewReport(${report.id}, 'more_info')">Request Info</button>
+                        <button class="btn btn-red" onclick="adminReviewReport(${report.id}, 'reject')">Reject</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading admin reports:', error);
+        container.innerHTML = '<div class="muted">Error loading admin reports.</div>';
+    }
+}
+
+function formatReportTime(value) {
+    if (!value) return 'Time not available';
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+    return date.toLocaleString();
+}
+
+function getStatusBadgeClass(status) {
+    const statusText = (status || '').toLowerCase();
+    if (statusText.includes('reject') || statusText.includes('no_accident')) {
+        return 'badge-red';
+    }
+    if (statusText.includes('verified') || statusText.includes('completed') || statusText.includes('assigned')) {
+        return 'badge-green';
+    }
+    return 'badge-yellow';
+}
+
+async function loadAdminAllReports() {
+    const container = document.getElementById('admin-all-reports-list');
+    if (!container) return;
+
+    try {
+        const response = await fetch('/api/admin/all-reports');
+        const reports = await response.json();
+
+        if (!Array.isArray(reports) || reports.length === 0) {
+            container.innerHTML = '<div class="muted">No accident reports have been submitted yet.</div>';
+            return;
+        }
+
+        container.innerHTML = reports.map(report => {
+            const verification = report.verification_status || 'pending';
+            const caseStatus = report.status || 'reported';
+            const tracking = report.tracking_status || 'not started';
+            const ambulance = report.driver_name
+                ? `${report.driver_name}${report.vehicle_no ? ' (' + report.vehicle_no + ')' : ''}`
+                : 'Not assigned';
+            const hospital = report.hospital_name || 'Not selected';
+
+            return `
+                <div class="admin-history-card">
+                    <div class="admin-history-top">
+                        <div>
+                            <strong>#${escapeHtml(report.id)} ${escapeHtml(report.location_name || 'Unknown location')}</strong>
+                            <span>${escapeHtml(formatReportTime(report.report_time))}</span>
+                        </div>
+                        <span class="badge ${getStatusBadgeClass(verification)}">${escapeHtml(verification.replace(/_/g, ' '))}</span>
+                    </div>
+                    <div class="admin-history-grid">
+                        <div><span>Emergency</span><strong>${escapeHtml(report.ai_emergency_type || 'General Emergency')}</strong></div>
+                        <div><span>Severity</span><strong>${escapeHtml(report.severity || 'moderate')}</strong></div>
+                        <div><span>Case status</span><strong>${escapeHtml(caseStatus.replace(/_/g, ' '))}</strong></div>
+                        <div><span>Tracking</span><strong>${escapeHtml(tracking.replace(/_/g, ' '))}</strong></div>
+                        <div><span>Ambulance</span><strong>${escapeHtml(ambulance)}</strong></div>
+                        <div><span>Hospital</span><strong>${escapeHtml(hospital)}</strong></div>
+                    </div>
+                    <div class="admin-history-footer">
+                        <span>AI confidence: ${escapeHtml(report.ai_confidence || 0)}%</span>
+                        <span>Keywords: ${escapeHtml(report.ai_keywords || 'None')}</span>
+                        ${report.eta_minutes ? `<span>ETA: ${escapeHtml(report.eta_minutes)} min</span>` : ''}
+                    </div>
+                    <button class="btn btn-outline btn-full" onclick="showAdminReportTimeline(${report.id})">View timeline</button>
+                    <div id="admin-history-timeline-${report.id}" class="timeline-panel admin-history-timeline" style="display:none"></div>
+                </div>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading all admin reports:', error);
+        container.innerHTML = '<div class="muted">Error loading accident report history.</div>';
+    }
+}
+
+async function showAdminReportTimeline(emergencyId) {
+    const panel = document.getElementById(`admin-history-timeline-${emergencyId}`);
+    if (!panel) return;
+
+    if (panel.style.display === 'block') {
+        panel.style.display = 'none';
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/emergency/${emergencyId}/timeline`);
+        const timeline = await response.json();
+
+        if (!Array.isArray(timeline) || timeline.length === 0) {
+            panel.style.display = 'block';
+            panel.innerHTML = '<div class="muted">No timeline events recorded yet.</div>';
+            return;
+        }
+
+        panel.style.display = 'block';
+        panel.innerHTML = `
+            <h3>Emergency Timeline</h3>
+            ${timeline.map(item => `
+                <div class="timeline-item">
+                    <strong>${escapeHtml(item.event_label)}</strong>
+                    <span>${escapeHtml(item.details || '')}</span>
+                </div>
+            `).join('')}
+        `;
+    } catch (error) {
+        console.error('Error loading admin report timeline:', error);
+        panel.style.display = 'block';
+        panel.innerHTML = '<div class="muted">Error loading timeline.</div>';
+    }
+}
+
+async function adminReviewReport(emergencyId, action) {
+    const card = document.querySelector(`.admin-report-card[data-emergency-id="${emergencyId}"]`);
+    const note = card ? (card.querySelector('.admin-note') || {}).value || '' : '';
+
+    try {
+        const response = await fetch(`/api/admin/verify/${emergencyId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, note })
+        });
+        const result = await response.json();
+
+        if (!result.success) {
+            throw new Error(result.message || 'Admin action failed');
+        }
+
+        await loadAdminReports();
+        await loadAdminAllReports();
+        if (document.getElementById('driver-page').classList.contains('active')) {
+            loadAlerts();
+        }
+    } catch (error) {
+        console.error('Admin review error:', error);
+        alert('Unable to update this report. Please try again.');
+    }
+}
+
+function renderMockCctvFeed(notification) {
+    const zone = notification.cctv_zone || 'KTM CCTV Zone';
+    const cameraId = notification.camera_id || 'KTM-CCTV-DEMO';
+
+    return `
+        <div class="mock-cctv-feed">
+            <div class="cctv-topline">
+                <span>${escapeHtml(cameraId)}</span>
+                <span>REC</span>
+            </div>
+            <div class="cctv-road">
+                <div class="cctv-lane"></div>
+                <div class="cctv-vehicle vehicle-one"></div>
+                <div class="cctv-vehicle vehicle-two"></div>
+                <div class="cctv-alert-dot"></div>
+            </div>
+            <div class="cctv-caption">${escapeHtml(zone)} mock feed</div>
+        </div>
+    `;
+}
+
+async function loadPoliceNotifications() {
+    const container = document.getElementById('police-notifications-list');
+    if (!container) return;
+
+    try {
+        const response = await fetch('/api/police/notifications');
+        const notifications = await response.json();
+
+        if (!Array.isArray(notifications) || notifications.length === 0) {
+            container.innerHTML = '<div class="muted">No CCTV alerts waiting for review.</div>';
+            return;
+        }
+
+        container.innerHTML = notifications.map(notification => {
+            const isPending = notification.status === 'cctv_review';
+            const severityClass = notification.severity === 'critical' ? 'red' : (notification.severity === 'moderate' ? 'yellow' : 'green');
+            return `
+                <div class="police-card" data-notification-id="${notification.notification_id}">
+                    <div class="alert-title">
+                        <strong>${escapeHtml(notification.cctv_zone || 'CCTV Alert')}</strong>
+                        <span class="badge badge-${severityClass}">${escapeHtml(notification.severity || 'medium')}</span>
+                    </div>
+                    ${renderMockCctvFeed(notification)}
+                    <div class="ai-mini">
+                        <div class="ai-mini-title">
+                            <strong>AI summary</strong>
+                            <span>${escapeHtml(notification.ai_confidence || 0)}% confidence</span>
+                        </div>
+                        <div>${escapeHtml(notification.ai_summary || 'Possible accident detected near CCTV zone.')}</div>
+                    </div>
+                    <p class="alert-info"><strong>Location pin:</strong> ${escapeHtml(notification.location_name || 'Unknown')}</p>
+                    <p class="alert-info"><strong>Reporter:</strong> ${escapeHtml(notification.reporter_name || 'Unknown')}</p>
+                    <p class="alert-info"><strong>Status:</strong> ${escapeHtml((notification.status || '').replace(/_/g, ' '))}</p>
+                    ${notification.verification_note ? `<p class="alert-info"><strong>Police note:</strong> ${escapeHtml(notification.verification_note)}</p>` : ''}
+                    ${isPending ? `
+                        <textarea class="input police-note" rows="2" placeholder="Optional CCTV verification note"></textarea>
+                        <div class="police-actions">
+                            <button class="btn btn-green" onclick="policeVerifyNotification(${notification.notification_id}, 'confirm')">Confirm Accident</button>
+                            <button class="btn btn-red" onclick="policeVerifyNotification(${notification.notification_id}, 'no_accident')">No Accident</button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading police notifications:', error);
+        container.innerHTML = '<div class="muted">Error loading CCTV alerts.</div>';
+    }
+}
+
+async function policeVerifyNotification(notificationId, action) {
+    const card = document.querySelector(`.police-card[data-notification-id="${notificationId}"]`);
+    const note = card ? (card.querySelector('.police-note') || {}).value || '' : '';
+
+    try {
+        const response = await fetch(`/api/police/verify/${notificationId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, note })
+        });
+        const result = await response.json();
+
+        if (!result.success) {
+            throw new Error(result.message || 'Police verification failed');
+        }
+
+        await loadPoliceNotifications();
+        if (document.getElementById('driver-page').classList.contains('active')) {
+            loadAlerts();
+        }
+    } catch (error) {
+        console.error('Police verification error:', error);
+        alert('Unable to update CCTV verification. Please try again.');
     }
 }
 
@@ -628,6 +1113,7 @@ async function acceptAlert(emergencyId, severity, injuryType, locationName) {
         document.getElementById('hospital-suggestions').style.display = 'none';
         await loadHospitalSuggestions(severity, injuryType);
         renderRoutePanel();
+        await sendTrackingUpdate('assigned');
         await initializeRouteMap(currentAssignment.locationName);
         
         // Update driver status
@@ -731,6 +1217,27 @@ async function loadHospitalSuggestions(severity, injuryType) {
     }
 }
 
+async function sendTrackingUpdate(status, extraData = {}) {
+    if (!currentAssignment || !currentAssignment.emergencyId) {
+        return;
+    }
+
+    try {
+        await fetch(`/api/tracking/${currentAssignment.emergencyId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                status,
+                ambulance_id: 1,
+                severity: currentAssignment.severity,
+                ...extraData
+            })
+        });
+    } catch (error) {
+        console.error('Tracking update failed:', error);
+    }
+}
+
 async function markRouteReached() {
     if (!currentAssignment) {
         return;
@@ -738,6 +1245,7 @@ async function markRouteReached() {
 
     if (currentAssignment.phase === 'to_scene') {
         currentAssignment.phase = 'to_hospital';
+        await sendTrackingUpdate('en_route');
         renderRoutePanel();
         await initializeRouteMap(currentHospitalRecommendations[0] ? currentHospitalRecommendations[0].location : currentAssignment.hospitalLocation);
         document.getElementById('driver-status').textContent = 'Transporting patient';
@@ -919,6 +1427,14 @@ function startLiveRouteTracking() {
 
             updateDriverMarker(location);
             refreshLiveRouteLine();
+            const now = Date.now();
+            if (currentAssignment && now - lastTrackingPost > 12000) {
+                lastTrackingPost = now;
+                sendTrackingUpdate(currentAssignment.phase === 'to_hospital' ? 'en_route' : 'assigned', {
+                    lat: location.lat,
+                    lng: location.lng
+                });
+            }
         },
         () => {
             updateLiveRouteStatus('location permission needed');
@@ -991,6 +1507,51 @@ async function initializeRouteMap(locationName) {
     }
 }
 
+async function loadHospitalNotifications() {
+    const container = document.getElementById('hospital-notifications-list');
+    if (!container) return;
+
+    try {
+        const selectedHospitalId = document.getElementById('hospital-select')
+            ? document.getElementById('hospital-select').value
+            : '';
+        const url = selectedHospitalId
+            ? `/api/hospital/notifications?hospital_id=${encodeURIComponent(selectedHospitalId)}`
+            : '/api/hospital/notifications';
+        const response = await fetch(url);
+        const notifications = await response.json();
+
+        if (!Array.isArray(notifications) || notifications.length === 0) {
+            container.innerHTML = '<div class="muted">No hospital notifications yet.</div>';
+            return;
+        }
+
+        container.innerHTML = notifications.map(item => {
+            const status = item.tracking_status || 'assigned';
+            const statusLabel = status.replace(/_/g, ' ');
+            const etaText = item.eta_minutes ? `${item.eta_minutes} min ETA` : 'ETA pending';
+            return `
+                <div class="hospital-notification-card">
+                    <div class="alert-title">
+                        <strong>${escapeHtml(item.emergency_type || 'Emergency incoming')}</strong>
+                        <span class="badge badge-red">${escapeHtml(item.severity || 'critical')}</span>
+                    </div>
+                    <p class="alert-info"><strong>Patient status:</strong> ${escapeHtml(item.patient_status || item.injury_type || 'Unknown')}</p>
+                    <p class="alert-info"><strong>Accident location:</strong> ${escapeHtml(item.location_name || 'Unknown')}</p>
+                    <p class="alert-info"><strong>Ambulance:</strong> ${escapeHtml(item.driver_name || 'Assigned driver')} ${item.vehicle_no ? `(${escapeHtml(item.vehicle_no)})` : ''}</p>
+                    <div class="tracking-strip">
+                        <span>${escapeHtml(statusLabel)}</span>
+                        <strong>${escapeHtml(etaText)}</strong>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading hospital notifications:', error);
+        container.innerHTML = '<div class="muted">Error loading hospital notifications.</div>';
+    }
+}
+
 //  HOSPITAL MANAGEMENT 
 async function loadHospitals() {
     try {
@@ -1027,6 +1588,7 @@ function loadHospitalData() {
     document.getElementById('chk-neuro').checked = h.has_neurosurgeon;
     document.getElementById('chk-burn').checked = h.has_burn_unit;
     document.getElementById('chk-blood').checked = h.has_blood_bank;
+    loadHospitalNotifications();
 }
 
 function validateHospitalForm() {
@@ -1083,6 +1645,7 @@ async function saveHospital() {
             const msg = document.getElementById('save-msg');
             msg.style.display = 'block';
             setTimeout(() => { msg.style.display = 'none'; }, 3000);
+            loadHospitalNotifications();
         } else {
             alert('Error updating hospital');
         }
@@ -1094,8 +1657,12 @@ async function saveHospital() {
 
 //  INITIALIZE ON PAGE LOAD 
 document.addEventListener('DOMContentLoaded', function() {
-    // Show home page by default
-    switchRole('home');
+    if (currentUserRole) {
+        switchRole(roleStartPages[currentUserRole] || 'home');
+    } else {
+        setActivePage('login');
+        updateLoginUi('login');
+    }
 
     // NEW FEATURE ADDED
     const emergencyForm = document.getElementById('step-form');
@@ -1152,6 +1719,16 @@ document.addEventListener('DOMContentLoaded', function() {
     setInterval(function() {
         if (document.getElementById('driver-page').classList.contains('active')) {
             loadAlerts();
+        }
+        if (document.getElementById('police-page').classList.contains('active')) {
+            loadPoliceNotifications();
+        }
+        if (document.getElementById('admin-page').classList.contains('active')) {
+            loadAdminReports();
+            loadAdminAllReports();
+        }
+        if (document.getElementById('hospital-page').classList.contains('active')) {
+            loadHospitalNotifications();
         }
     }, 10000);
 });

@@ -93,6 +93,33 @@ The UI also explains why each hospital was recommended.
 8. Accept the case.
 9. View live route tracking and hospital recommendations with AI explanations.
 
+## Admin-Verified Workflow
+
+LifeLink also supports the full verified emergency workflow:
+
+1. Reporter uses `Submit Emergency Report`.
+2. AI stores emergency type, severity, keywords, confidence, and medical requirements.
+3. Admin opens `Admin Verification` and can verify, reject, or request more information.
+4. Verified reports are released to nearby ambulance drivers.
+5. When one driver accepts, other dispatch requests are marked cancelled.
+6. The selected hospital receives an incoming emergency notification.
+7. Driver tracking updates case status and ETA for hospital preparation.
+8. The emergency timeline records report, AI analysis, verification, dispatch, hospital notification, tracking, and completion events.
+
+## Police CCTV Verification Flow
+
+For the hackathon demo, LifeLink supports a Kathmandu-focused CCTV verification layer:
+
+1. Reporter uses `Submit Emergency Report`.
+2. AI extracts location, severity, keywords, emergency type, and confidence score.
+3. The system checks mock Kathmandu CCTV zones such as Baneshwor, Koteshwor, Chabahil, Kalanki, Ratna Park, and Thamel.
+4. If a zone matches, the Police CCTV dashboard receives an internal demo alert with a mock feed, location pin text, and AI summary.
+5. Police can choose only `Confirm Accident` or `No Accident`.
+6. Confirmed accidents are released to nearby ambulance drivers.
+7. No-accident cases are rejected before ambulance dispatch.
+
+This is intentionally demo-only. It does not call, message, or store any real police contact number.
+
 ## Core Modules
 
 ### Emergency Reporting

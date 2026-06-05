@@ -11,6 +11,16 @@ body {
     line-height: 1.6;
     min-height: 100vh;
 }
+
+body.auth-screen-active {
+    background:
+        linear-gradient(135deg, rgba(139, 0, 0, 0.08), rgba(29, 158, 117, 0.08)),
+        #eef3f6;
+}
+
+body.auth-screen-active .navbar {
+    display: none;
+}
 .nav-logo{
     position: fixed;
     top: -20px;
@@ -93,6 +103,41 @@ body {
     background: #8B0000;
     color: white;
     border-color: #8B0000;
+}
+
+.nav-btn.locked,
+.nav-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: #f1f3f5;
+    color: #999;
+}
+
+.nav-btn.locked:hover,
+.nav-btn:disabled:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: #ddd;
+    background: #f1f3f5;
+    color: #999;
+}
+
+.logout-btn {
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    background: white;
+    color: #8B0000;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.logout-btn:hover {
+    border-color: #8B0000;
+    background: #fff8f8;
 }
 
 /* Page Sections */
@@ -197,6 +242,20 @@ body {
     transform: translateY(-4px);
 }
 
+.role-card.locked,
+.role-card:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.role-card.locked:hover,
+.role-card:disabled:hover {
+    border-color: #ddd;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transform: none;
+}
+
 .role-icon { 
     font-size: 2.5rem; 
     margin-bottom: 0.75rem;
@@ -212,6 +271,192 @@ body {
 .role-card p { 
     font-size: 0.8rem; 
     color: #888;
+}
+
+.login-screen {
+    width: min(1060px, calc(100% - 2rem));
+    min-height: 100vh;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: minmax(280px, 0.92fr) minmax(320px, 1.08fr);
+    align-items: center;
+    gap: 1.25rem;
+    padding: 2rem 0;
+}
+
+.login-brand-panel,
+.login-panel {
+    border-radius: 18px;
+    min-height: 560px;
+}
+
+.login-brand-panel {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    color: white;
+    padding: 2rem;
+    background:
+        linear-gradient(160deg, rgba(139, 0, 0, 0.95), rgba(26, 77, 91, 0.94)),
+        #8B0000;
+    box-shadow: 0 24px 60px rgba(45, 55, 72, 0.18);
+}
+
+.login-logo-mark {
+    width: 64px;
+    height: 64px;
+    display: grid;
+    place-items: center;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    font-weight: 900;
+    font-size: 1.35rem;
+    margin-bottom: 1.25rem;
+}
+
+.login-brand-panel h1 {
+    font-size: 2.6rem;
+    line-height: 1.05;
+    margin-bottom: 1rem;
+}
+
+.login-brand-panel p {
+    color: rgba(255, 255, 255, 0.84);
+    font-size: 1rem;
+    max-width: 360px;
+}
+
+.login-flow-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 2rem;
+}
+
+.login-flow-strip span {
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 999px;
+    padding: 0.35rem 0.65rem;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.login-panel {
+    background: white;
+    padding: 2rem;
+    border: 1px solid #dfe7ec;
+    box-shadow: 0 24px 60px rgba(45, 55, 72, 0.16);
+}
+
+.login-panel-header {
+    margin-bottom: 1.25rem;
+}
+
+.login-kicker {
+    display: inline-flex;
+    border-radius: 999px;
+    background: #f7fbff;
+    border: 1px solid #d8e4ef;
+    color: #17496b;
+    padding: 0.3rem 0.6rem;
+    font-size: 12px;
+    font-weight: 800;
+    margin-bottom: 0.85rem;
+}
+
+.login-panel h2 {
+    font-size: 1.85rem;
+    line-height: 1.15;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+.login-panel p {
+    color: #607080;
+    font-size: 14px;
+}
+
+.login-input {
+    background: white;
+    margin-bottom: 1.15rem;
+}
+
+.login-role-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+}
+
+.login-role-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 68px;
+    border: 1px solid #d8e4ef;
+    border-radius: 10px;
+    background: #ffffff;
+    padding: 0.85rem 1rem;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.25s ease;
+}
+
+.login-role-card::after {
+    content: "Open";
+    flex-shrink: 0;
+    color: #8B0000;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.login-role-card:hover {
+    border-color: #8B0000;
+    background: #fff8f8;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgba(139, 0, 0, 0.12);
+}
+
+.login-role-card strong,
+.login-role-card span {
+    display: block;
+}
+
+.login-role-card strong {
+    color: #2c3e50;
+    font-size: 0.95rem;
+    margin-bottom: 0.15rem;
+}
+
+.login-role-card span {
+    color: #607080;
+    font-size: 12px;
+}
+
+.client-role {
+    border-left: 5px solid #1D9E75;
+}
+
+.admin-role {
+    border-left: 5px solid #8B0000;
+}
+
+.driver-role {
+    border-left: 5px solid #9a6a00;
+}
+
+.login-note {
+    margin-top: 1rem;
+    padding: 0.85rem;
+    border-radius: 8px;
+    background: #f8f9fa;
+    border: 1px solid #e5eaef;
+    color: #607080;
+    font-size: 12px;
 }
 
 
@@ -922,6 +1167,268 @@ body {
     line-height: 1.5;
 }
 
+.admin-report-card,
+.police-card,
+.hospital-notification-card {
+    border: 1px solid #d8e4ef;
+    border-radius: 10px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(23, 73, 107, 0.06);
+}
+
+.admin-report-card {
+    border-left: 5px solid #8B0000;
+}
+
+.police-card {
+    border-left: 5px solid #17496b;
+}
+
+.admin-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.75rem;
+}
+
+.admin-history-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.admin-history-card {
+    border: 1px solid #d8e4ef;
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(23, 73, 107, 0.06);
+}
+
+.admin-history-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.85rem;
+}
+
+.admin-history-top strong,
+.admin-history-top span {
+    display: block;
+}
+
+.admin-history-top strong {
+    color: #2c3e50;
+    font-size: 0.95rem;
+}
+
+.admin-history-top div span {
+    color: #607080;
+    font-size: 12px;
+    margin-top: 0.2rem;
+}
+
+.admin-history-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 0.65rem;
+}
+
+.admin-history-grid div {
+    border: 1px solid #e5eaef;
+    border-radius: 8px;
+    background: #f8f9fa;
+    padding: 0.65rem;
+}
+
+.admin-history-grid span,
+.admin-history-grid strong {
+    display: block;
+    font-size: 12px;
+}
+
+.admin-history-grid span {
+    color: #607080;
+    margin-bottom: 0.2rem;
+}
+
+.admin-history-grid strong {
+    color: #2c3e50;
+    text-transform: capitalize;
+}
+
+.admin-history-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.admin-history-footer span {
+    border-radius: 999px;
+    background: #f7fbff;
+    border: 1px solid #d8e4ef;
+    color: #17496b;
+    padding: 0.25rem 0.55rem;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.admin-history-timeline {
+    margin-bottom: 0;
+}
+
+.police-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+}
+
+.mock-cctv-feed {
+    position: relative;
+    overflow: hidden;
+    min-height: 190px;
+    margin: 0.75rem 0 1rem;
+    border-radius: 10px;
+    border: 1px solid #1d3342;
+    background: #15232d;
+    color: white;
+}
+
+.mock-cctv-feed::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        repeating-linear-gradient(
+            to bottom,
+            rgba(255,255,255,0.04) 0,
+            rgba(255,255,255,0.04) 1px,
+            transparent 1px,
+            transparent 8px
+        );
+    pointer-events: none;
+}
+
+.cctv-topline,
+.cctv-caption {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    justify-content: space-between;
+    padding: 0.65rem 0.75rem;
+    font-size: 12px;
+    letter-spacing: 0;
+    background: rgba(0, 0, 0, 0.28);
+}
+
+.cctv-road {
+    position: relative;
+    height: 128px;
+    background:
+        linear-gradient(90deg, transparent 0 18%, rgba(255,255,255,0.08) 18% 19%, transparent 19% 48%, rgba(255,255,255,0.08) 48% 49%, transparent 49% 78%, rgba(255,255,255,0.08) 78% 79%, transparent 79%),
+        linear-gradient(180deg, #263746, #172733);
+}
+
+.cctv-lane {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 2px;
+    height: 100%;
+    background: repeating-linear-gradient(to bottom, #f6d56b 0 12px, transparent 12px 24px);
+}
+
+.cctv-vehicle {
+    position: absolute;
+    width: 42px;
+    height: 22px;
+    border-radius: 4px;
+    background: #d8e4ef;
+    box-shadow: 0 0 10px rgba(255,255,255,0.18);
+}
+
+.vehicle-one {
+    left: 30%;
+    top: 38px;
+}
+
+.vehicle-two {
+    right: 24%;
+    bottom: 30px;
+    background: #8B0000;
+}
+
+.cctv-alert-dot {
+    position: absolute;
+    left: 51%;
+    top: 58px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #e24b4a;
+    box-shadow: 0 0 0 7px rgba(226, 75, 74, 0.24);
+}
+
+.timeline-panel {
+    margin-top: 1rem;
+    border: 1px solid #d8e4ef;
+    border-radius: 10px;
+    padding: 1rem;
+    background: #f7fbff;
+}
+
+.timeline-panel h3 {
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+    color: #17496b;
+}
+
+.timeline-item {
+    border-left: 4px solid #2d6a1a;
+    padding: 0.65rem 0.75rem;
+    margin-bottom: 0.65rem;
+    background: white;
+    border-radius: 6px;
+}
+
+.timeline-item strong,
+.timeline-item span {
+    display: block;
+    font-size: 13px;
+}
+
+.timeline-item span {
+    color: #607080;
+    margin-top: 0.2rem;
+}
+
+.tracking-strip {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    padding: 0.75rem;
+    border-radius: 8px;
+    background: #eef7ff;
+    border: 1px solid #d8e4ef;
+    text-transform: capitalize;
+}
+
+.tracking-strip span {
+    color: #17496b;
+    font-weight: 700;
+}
+
+.tracking-strip strong {
+    color: #8B0000;
+}
+
 .muted { 
     color: #999; 
     font-size: 13px;
@@ -961,6 +1468,61 @@ body {
 
 /* Responsive Design */
 @media (max-width: 768px) {
+    .login-screen {
+        width: min(100% - 1rem, 520px);
+        min-height: 100vh;
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+        padding: 0.75rem 0;
+    }
+
+    .login-brand-panel,
+    .login-panel {
+        min-height: auto;
+        border-radius: 14px;
+    }
+
+    .login-brand-panel {
+        padding: 1.25rem;
+    }
+
+    .login-logo-mark {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        margin-bottom: 0.75rem;
+    }
+
+    .login-brand-panel h1 {
+        font-size: 2rem;
+    }
+
+    .login-flow-strip {
+        margin-top: 1rem;
+    }
+
+    .login-panel {
+        padding: 1.25rem;
+    }
+
+    .login-panel h2 {
+        font-size: 1.45rem;
+    }
+
+    .admin-history-header,
+    .admin-history-top {
+        display: block;
+    }
+
+    .admin-history-header .btn {
+        width: 100%;
+        margin-top: 0.75rem;
+    }
+
+    .admin-history-top .badge {
+        margin-top: 0.75rem;
+    }
+
     .hero {
         padding: 2rem 1rem;
     }
@@ -1026,6 +1588,21 @@ body {
 }
 
 @media (max-width: 480px) {
+    .login-screen {
+        width: 100%;
+        padding: 0;
+    }
+
+    .login-brand-panel,
+    .login-panel {
+        border-radius: 0;
+    }
+
+    .login-role-card {
+        min-height: 62px;
+        padding: 0.75rem;
+    }
+
     .hero h1 {
         font-size: 1.5rem;
     }

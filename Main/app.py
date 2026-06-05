@@ -16,6 +16,20 @@ from ai_features import (
     get_triage_confidence,
     suggest_route_decision,
 )
+from workflow_features import (
+    add_timeline_event,
+    analyze_emergency_report,
+    calculate_demo_eta,
+    create_police_cctv_notification,
+    create_initial_timeline,
+    ensure_workflow_schema,
+    get_optional_float,
+    mark_dispatch_accepted,
+    match_cctv_zone,
+    notify_hospital,
+    send_dispatch_requests,
+    update_tracking_status,
+)
 import os
 
 basedir = os.path.dirname(os.path.abspath(__file__))
@@ -200,6 +214,7 @@ def submit_emergency():
     data = request.json
     conn = get_connection()
     cur = conn.cursor()
+    ensure_workflow_schema(cur)
 
     # Save emergency to database
     cur.execute("""
@@ -265,6 +280,506 @@ def submit_emergency():
         conn.close()
         return result
     
+
+@app.route('/api/workflow/report', methods=['POST'])
+def submit_workflow_report():
+    data = request.json or {}
+    analysis = analyze_emergency_report(data)
+    severity = data.get('severity') or analysis['severity']
+    injury_type = (
+        data.get('injury_type')
+        or data.get('description')
+        or data.get('voice_text')
+        or 'Unknown'
+    )
+
+    conn = get_connection()
+    cur = conn.cursor()
+    ensure_workflow_schema(cur)
+
+    reporter_lat = get_optional_float(data, 'reporter_lat', 'user_lat')
+    reporter_lng = get_optional_float(data, 'reporter_lng', 'user_lng')
+    accident_lat = get_optional_float(data, 'accident_lat', 'lat', 'latitude')
+    accident_lng = get_optional_float(data, 'accident_lng', 'lng', 'longitude')
+
+    location_name = data.get('location_name') or data.get('location') or 'Unknown location'
+    cctv_match = match_cctv_zone(location_name)
+    initial_status = 'police_review' if cctv_match['cctv_available'] else 'admin_review'
+
+    cur.execute("""
+        INSERT INTO emergencies (
+            reporter_name,
+            location_name,
+            severity,
+            injury_type,
+            status,
+            ai_emergency_type,
+            ai_confidence,
+            ai_keywords,
+            possible_medical_requirements,
+            report_source,
+            reporter_lat,
+            reporter_lng,
+            accident_lat,
+            accident_lng,
+            verification_status,
+            tracking_status,
+            patient_status
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', 'reported', %s)
+        RETURNING id
+    """, (
+        data.get('reporter_name') or 'Unknown reporter',
+        location_name,
+        severity,
+        injury_type,
+        initial_status,
+        analysis['emergency_type'],
+        analysis['confidence_score'],
+        ', '.join(analysis['keywords']),
+        ', '.join(analysis['medical_requirements']),
+        data.get('report_source') or ('voice' if data.get('voice_text') else 'form'),
+        reporter_lat,
+        reporter_lng,
+        accident_lat,
+        accident_lng,
+        data.get('patient_status') or injury_type,
+    ))
+
+    emergency_id = cur.fetchone()[0]
+    create_initial_timeline(cur, emergency_id, analysis)
+    police_alert_created = create_police_cctv_notification(cur, emergency_id, cctv_match, analysis)
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return jsonify({
+        'success': True,
+        'emergency_id': emergency_id,
+        'status': initial_status,
+        'message': 'Report sent to Police CCTV verification' if police_alert_created else 'Report sent to admin verification',
+        'ai_analysis': analysis,
+        'cctv_match': cctv_match,
+        'police_alert_created': police_alert_created
+    })
+
+
+@app.route('/api/admin/reports', methods=['GET'])
+def get_admin_reports():
+    conn = get_connection()
+    cur = conn.cursor()
+    ensure_workflow_schema(cur)
+
+    cur.execute("""
+        SELECT id, reporter_name, location_name, severity, injury_type, status,
+               ai_emergency_type, ai_confidence, ai_keywords,
+               possible_medical_requirements, report_source,
+               verification_status, verification_note, more_info_request,
+               report_time
+        FROM emergencies
+        WHERE status IN ('admin_review', 'more_info_requested')
+           OR verification_status = 'more_info_requested'
+        ORDER BY report_time DESC, id DESC
+        LIMIT 30
+    """)
+
+    rows = cur.fetchall()
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    reports = []
+    for row in rows:
+        reports.append({
+            'id': row[0],
+            'reporter_name': row[1],
+            'location_name': row[2],
+            'severity': row[3],
+            'injury_type': row[4],
+            'status': row[5],
+            'ai_emergency_type': row[6],
+            'ai_confidence': row[7],
+            'ai_keywords': row[8],
+            'possible_medical_requirements': row[9],
+            'report_source': row[10],
+            'verification_status': row[11],
+            'verification_note': row[12],
+            'more_info_request': row[13],
+            'report_time': row[14].isoformat() if row[14] else None
+        })
+
+    return jsonify(reports)
+
+
+@app.route('/api/admin/all-reports', methods=['GET'])
+def get_all_admin_reports():
+    conn = get_connection()
+    cur = conn.cursor()
+    ensure_workflow_schema(cur)
+
+    cur.execute("""
+        SELECT e.id, e.reporter_name, e.location_name, e.severity, e.injury_type,
+               e.status, e.verification_status, e.tracking_status,
+               e.ai_emergency_type, e.ai_confidence, e.ai_keywords,
+               e.report_time, e.created_at, e.eta_minutes,
+               a.driver_name, a.vehicle_no,
+               h.name AS hospital_name
+        FROM emergencies e
+        LEFT JOIN ambulances a ON e.ambulance_id = a.id
+        LEFT JOIN hospitals h ON e.hospital_id = h.id
+        ORDER BY COALESCE(e.report_time, e.created_at) DESC, e.id DESC
+        LIMIT 100
+    """)
+
+    rows = cur.fetchall()
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    reports = []
+    for row in rows:
+        report_time = row[11] or row[12]
+        reports.append({
+            'id': row[0],
+            'reporter_name': row[1],
+            'location_name': row[2],
+            'severity': row[3],
+            'injury_type': row[4],
+            'status': row[5],
+            'verification_status': row[6],
+            'tracking_status': row[7],
+            'ai_emergency_type': row[8],
+            'ai_confidence': row[9],
+            'ai_keywords': row[10],
+            'report_time': report_time.isoformat() if report_time else None,
+            'eta_minutes': row[13],
+            'driver_name': row[14],
+            'vehicle_no': row[15],
+            'hospital_name': row[16]
+        })
+
+    return jsonify(reports)
+
+
+@app.route('/api/admin/verify/<int:emergency_id>', methods=['POST'])
+def verify_admin_report(emergency_id):
+    data = request.json or {}
+    action = data.get('action', 'verify')
+    note = data.get('note', '')
+
+    conn = get_connection()
+    cur = conn.cursor()
+    ensure_workflow_schema(cur)
+
+    if action == 'reject':
+        cur.execute("""
+            UPDATE emergencies
+            SET status = 'rejected',
+                verification_status = 'rejected',
+                verification_note = %s
+            WHERE id = %s
+        """, (note, emergency_id))
+        add_timeline_event(cur, emergency_id, 'admin_rejected', 'Admin Rejected', note or 'Report rejected by admin.')
+        response = {'success': True, 'status': 'rejected'}
+    elif action == 'more_info':
+        cur.execute("""
+            UPDATE emergencies
+            SET status = 'more_info_requested',
+                verification_status = 'more_info_requested',
+                more_info_request = %s
+            WHERE id = %s
+        """, (note or 'More information requested by admin.', emergency_id))
+        add_timeline_event(cur, emergency_id, 'more_info_requested', 'More Information Requested', note)
+        response = {'success': True, 'status': 'more_info_requested'}
+    else:
+        cur.execute("""
+            UPDATE emergencies
+            SET status = 'pending',
+                verification_status = 'verified',
+                verification_note = %s,
+                verified_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (note or 'Verified by admin.', emergency_id))
+        add_timeline_event(cur, emergency_id, 'admin_verified', 'Admin Verified', note or 'Report verified by admin.')
+        ambulance_ids = send_dispatch_requests(cur, emergency_id)
+        response = {
+            'success': True,
+            'status': 'verified',
+            'dispatch_request_count': len(ambulance_ids),
+            'ambulance_ids': ambulance_ids
+        }
+
+    conn.commit()
+    cur.close()
+    conn.close()
+    return jsonify(response)
+
+
+@app.route('/api/emergency/<int:emergency_id>/timeline', methods=['GET'])
+def get_emergency_timeline(emergency_id):
+    conn = get_connection()
+    cur = conn.cursor()
+    ensure_workflow_schema(cur)
+
+    cur.execute("""
+        SELECT event_key, event_label, details, created_at
+        FROM emergency_timeline
+        WHERE emergency_id = %s
+        ORDER BY created_at ASC, id ASC
+    """, (emergency_id,))
+
+    rows = cur.fetchall()
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return jsonify([{
+        'event_key': row[0],
+        'event_label': row[1],
+        'details': row[2],
+        'created_at': row[3].isoformat() if row[3] else None
+    } for row in rows])
+
+
+@app.route('/api/hospital/notifications', methods=['GET'])
+def get_hospital_notifications():
+    hospital_id = request.args.get('hospital_id')
+    conn = get_connection()
+    cur = conn.cursor()
+    ensure_workflow_schema(cur)
+
+    params = []
+    hospital_filter = ''
+    if hospital_id:
+        hospital_filter = 'AND hn.hospital_id = %s'
+        params.append(hospital_id)
+
+    cur.execute(f"""
+        SELECT hn.id, hn.status, hn.created_at,
+               e.id, e.location_name, e.severity, e.injury_type,
+               e.ai_emergency_type, e.patient_status, e.tracking_status,
+               e.eta_minutes,
+               a.driver_name, a.vehicle_no,
+               h.name, h.location
+        FROM hospital_notifications hn
+        JOIN emergencies e ON hn.emergency_id = e.id
+        LEFT JOIN ambulances a ON e.ambulance_id = a.id
+        LEFT JOIN hospitals h ON hn.hospital_id = h.id
+        WHERE 1 = 1 {hospital_filter}
+        ORDER BY hn.created_at DESC
+        LIMIT 20
+    """, tuple(params))
+
+    rows = cur.fetchall()
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return jsonify([{
+        'notification_id': row[0],
+        'notification_status': row[1],
+        'created_at': row[2].isoformat() if row[2] else None,
+        'emergency_id': row[3],
+        'location_name': row[4],
+        'severity': row[5],
+        'injury_type': row[6],
+        'emergency_type': row[7],
+        'patient_status': row[8],
+        'tracking_status': row[9],
+        'eta_minutes': row[10],
+        'driver_name': row[11],
+        'vehicle_no': row[12],
+        'hospital_name': row[13],
+        'hospital_location': row[14]
+    } for row in rows])
+
+
+@app.route('/api/police/notifications', methods=['GET'])
+def get_police_notifications():
+    conn = get_connection()
+    cur = conn.cursor()
+    ensure_workflow_schema(cur)
+
+    cur.execute("""
+        SELECT pn.id, pn.status, pn.cctv_zone, pn.camera_id, pn.ai_summary,
+               pn.verification_note, pn.created_at, pn.verified_at,
+               e.id, e.reporter_name, e.location_name, e.severity, e.injury_type,
+               e.ai_emergency_type, e.ai_confidence, e.tracking_status, e.eta_minutes
+        FROM police_notifications pn
+        JOIN emergencies e ON pn.emergency_id = e.id
+        ORDER BY pn.created_at DESC
+        LIMIT 30
+    """)
+
+    rows = cur.fetchall()
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return jsonify([{
+        'notification_id': row[0],
+        'status': row[1],
+        'cctv_zone': row[2],
+        'camera_id': row[3],
+        'ai_summary': row[4],
+        'verification_note': row[5],
+        'created_at': row[6].isoformat() if row[6] else None,
+        'verified_at': row[7].isoformat() if row[7] else None,
+        'emergency_id': row[8],
+        'reporter_name': row[9],
+        'location_name': row[10],
+        'severity': row[11],
+        'injury_type': row[12],
+        'emergency_type': row[13],
+        'ai_confidence': row[14],
+        'tracking_status': row[15],
+        'eta_minutes': row[16]
+    } for row in rows])
+
+
+@app.route('/api/police/verify/<int:notification_id>', methods=['POST'])
+def verify_police_notification(notification_id):
+    data = request.json or {}
+    action = data.get('action', 'confirm')
+    note = data.get('note', '')
+
+    conn = get_connection()
+    cur = conn.cursor()
+    ensure_workflow_schema(cur)
+
+    cur.execute("""
+        SELECT emergency_id
+        FROM police_notifications
+        WHERE id = %s
+    """, (notification_id,))
+    row = cur.fetchone()
+
+    if not row:
+        cur.close()
+        conn.close()
+        return jsonify({'success': False, 'message': 'Police notification not found'}), 404
+
+    emergency_id = row[0]
+    if action == 'no_accident':
+        cur.execute("""
+            UPDATE police_notifications
+            SET status = 'no_accident',
+                verification_note = %s,
+                verified_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (note or 'Police CCTV review found no visible accident.', notification_id))
+        cur.execute("""
+            UPDATE emergencies
+            SET status = 'rejected',
+                verification_status = 'rejected',
+                verification_note = %s
+            WHERE id = %s
+        """, (note or 'No accident confirmed by mock CCTV review.', emergency_id))
+        add_timeline_event(
+            cur,
+            emergency_id,
+            'police_no_accident',
+            'Police Marked No Accident',
+            note or 'Mock CCTV review found no visible accident.'
+        )
+        response = {'success': True, 'status': 'no_accident'}
+    else:
+        cur.execute("""
+            UPDATE police_notifications
+            SET status = 'confirmed',
+                verification_note = %s,
+                verified_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (note or 'Police CCTV review confirmed accident.', notification_id))
+        cur.execute("""
+            UPDATE emergencies
+            SET status = 'pending',
+                verification_status = 'verified',
+                verification_note = %s,
+                verified_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (note or 'Confirmed by mock Police CCTV dashboard.', emergency_id))
+        add_timeline_event(
+            cur,
+            emergency_id,
+            'police_confirmed',
+            'Police Confirmed Accident',
+            note or 'Mock CCTV review confirmed accident.'
+        )
+        ambulance_ids = send_dispatch_requests(cur, emergency_id)
+        response = {
+            'success': True,
+            'status': 'confirmed',
+            'dispatch_request_count': len(ambulance_ids),
+            'ambulance_ids': ambulance_ids
+        }
+
+    conn.commit()
+    cur.close()
+    conn.close()
+    return jsonify(response)
+
+
+@app.route('/api/tracking/<int:emergency_id>', methods=['GET', 'POST'])
+def emergency_tracking(emergency_id):
+    conn = get_connection()
+    cur = conn.cursor()
+    ensure_workflow_schema(cur)
+
+    if request.method == 'POST':
+        data = request.json or {}
+        status = data.get('status') or 'en_route'
+        eta_minutes = data.get('eta_minutes')
+        if eta_minutes is None:
+            eta_minutes = calculate_demo_eta(data.get('distance_km'), data.get('severity'))
+
+        update_tracking_status(
+            cur,
+            emergency_id,
+            status,
+            data.get('ambulance_id'),
+            get_optional_float(data, 'lat', 'latitude'),
+            get_optional_float(data, 'lng', 'longitude'),
+            eta_minutes
+        )
+        conn.commit()
+
+    cur.execute("""
+        SELECT e.id, e.tracking_status, e.eta_minutes,
+               al.lat, al.lng, al.updated_at,
+               a.driver_name, a.vehicle_no
+        FROM emergencies e
+        LEFT JOIN ambulances a ON e.ambulance_id = a.id
+        LEFT JOIN LATERAL (
+            SELECT lat, lng, updated_at
+            FROM ambulance_locations
+            WHERE emergency_id = e.id
+            ORDER BY updated_at DESC, id DESC
+            LIMIT 1
+        ) al ON TRUE
+        WHERE e.id = %s
+    """, (emergency_id,))
+
+    row = cur.fetchone()
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    if not row:
+        return jsonify({'error': 'Emergency not found'}), 404
+
+    return jsonify({
+        'emergency_id': row[0],
+        'tracking_status': row[1],
+        'eta_minutes': row[2],
+        'lat': row[3],
+        'lng': row[4],
+        'updated_at': row[5].isoformat() if row[5] else None,
+        'driver_name': row[6],
+        'vehicle_no': row[7]
+    })
+
     
     # USER: Check status of their emergency
 @app.route('/api/emergency/<int:emergency_id>', methods=['GET'])
@@ -303,16 +818,19 @@ def get_emergency_status(emergency_id):
 def get_alerts():
     conn = get_connection()
     cur = conn.cursor()
+    ensure_workflow_schema(cur)
 
     cur.execute("""
         SELECT id, reporter_name, location_name, severity, injury_type, status
         FROM emergencies
-        WHERE status = 'pending' OR status = 'ambulance_assigned'
+        WHERE (status = 'pending' OR status = 'ambulance_assigned')
+          AND verification_status = 'verified'
         ORDER BY created_at DESC
         LIMIT 10
     """)
 
     rows = cur.fetchall()
+    conn.commit()
     cur.close()
     conn.close()
 
@@ -337,6 +855,7 @@ def accept_emergency(emergency_id):
 
     conn = get_connection()
     cur = conn.cursor()
+    ensure_workflow_schema(cur)
 
     cur.execute("""
         SELECT location_name, severity, injury_type
@@ -369,6 +888,7 @@ def accept_emergency(emergency_id):
 
     # Mark ambulance busy
     cur.execute("UPDATE ambulances SET status = 'busy' WHERE id = %s", (ambulance_id,))
+    mark_dispatch_accepted(cur, emergency_id, ambulance_id)
 
     hospitals = get_hospital_recommendations(cur, severity, injury_type)
     assigned_hospital = hospitals[0] if hospitals else None
@@ -379,6 +899,9 @@ def accept_emergency(emergency_id):
             SET hospital_id = %s
             WHERE id = %s
         """, (assigned_hospital['id'], emergency_id))
+        notify_hospital(cur, emergency_id, assigned_hospital['id'])
+
+    update_tracking_status(cur, emergency_id, 'assigned', ambulance_id, eta_minutes=calculate_demo_eta(severity=severity))
 
     conn.commit()
     cur.close()
@@ -396,6 +919,7 @@ def accept_emergency(emergency_id):
 def reach_hospital(emergency_id):
     conn = get_connection()
     cur = conn.cursor()
+    ensure_workflow_schema(cur)
 
     cur.execute("""
         SELECT ambulance_id
@@ -418,6 +942,8 @@ def reach_hospital(emergency_id):
             SET status = 'free'
             WHERE id = %s
         """, (ambulance_id,))
+
+    update_tracking_status(cur, emergency_id, 'completed', ambulance_id)
 
     conn.commit()
     cur.close()

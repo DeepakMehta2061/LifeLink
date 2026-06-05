@@ -29,19 +29,70 @@
             </div>
             <div class="nav-role-indicator">
                 <span id="current-role" class="role-badge">Home</span>
+                <button id="logout-btn" class="logout-btn" onclick="logoutUser()" style="display:none">Logout</button>
             </div>
             <button id="menu-toggle" class="menu-toggle">☰</button>
         </div>
         <div id="nav-menu" class="nav-menu">
             <button class="nav-btn" onclick="switchRole('home')">Home</button>
             <button class="nav-btn" onclick="switchRole('user')">Report Emergency</button>
+            <button class="nav-btn" onclick="switchRole('police')">Police CCTV</button>
+            <button class="nav-btn" onclick="switchRole('admin')">Admin Verification</button>
             <button class="nav-btn" onclick="switchRole('driver')">Ambulance Driver</button>
             <button class="nav-btn" onclick="switchRole('hospital')">Hospital System</button>
         </div>
     </nav>
 
+    <!-- Login Page -->
+    <div id="login-page" class="page-section active">
+        <div class="login-screen">
+            <div class="login-brand-panel">
+                <div class="login-logo-mark">LL</div>
+                <h1>LifeLink</h1>
+                <p>Role-based emergency response access for accident reporting, verification, ambulance dispatch, and hospital readiness.</p>
+                <div class="login-flow-strip">
+                    <span>AI</span>
+                    <span>CCTV</span>
+                    <span>Admin</span>
+                    <span>Ambulance</span>
+                    <span>Hospital</span>
+                </div>
+            </div>
+
+            <div class="login-panel">
+                <div class="login-panel-header">
+                    <span class="login-kicker">Secure demo login</span>
+                    <h2>Choose Your Access</h2>
+                    <p>Admin controls verification, CCTV review, and hospital readiness. Client and Driver get their own focused dashboards.</p>
+                </div>
+
+                <label class="label" for="login-name">Name or Demo ID</label>
+                <input type="text" id="login-name" placeholder="e.g., Deepak, Admin Demo, Driver 1" class="input login-input">
+
+                <div class="login-role-grid">
+                    <button class="login-role-card client-role" onclick="loginAs('user')">
+                        <strong>Client</strong>
+                        <span>Report accident</span>
+                    </button>
+                    <button class="login-role-card admin-role" onclick="loginAs('admin')">
+                        <strong>Admin</strong>
+                        <span>Reports, CCTV, hospitals</span>
+                    </button>
+                    <button class="login-role-card driver-role" onclick="loginAs('driver')">
+                        <strong>Driver</strong>
+                        <span>Accept ambulance case</span>
+                    </button>
+                </div>
+
+                <div class="login-note">
+                    This is hackathon access control for the demo. It does not use real passwords or external authority systems.
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Hero Section (Home) -->
-    <div id="home-page" class="page-section active">
+    <div id="home-page" class="page-section">
         <div class="hero">
             <div class="live-badge">● LIVE SYSTEM</div>
             <p>Connecting accident victims, ambulances &amp; hospitals in real time</p>
@@ -62,6 +113,18 @@
                     <div class="role-icon">Driver</div>
                     <h3>Ambulance Driver</h3>
                     <p>View active alerts</p>
+                </button>
+
+                <button class="role-card" onclick="switchRole('admin')">
+                    <div class="role-icon">Admin</div>
+                    <h3>Admin Verification</h3>
+                    <p>Verify reports first</p>
+                </button>
+
+                <button class="role-card" onclick="switchRole('police')">
+                    <div class="role-icon">CCTV</div>
+                    <h3>Police Control</h3>
+                    <p>Confirm accidents</p>
                 </button>
 
                 <button class="role-card" onclick="switchRole('hospital')">
@@ -132,16 +195,16 @@
                     <option value="Unknown">Unknown</option>
                 </select>
 
-                <button onclick="submitEmergency()" class="btn btn-red btn-full">
-                    Send Emergency Alert
+                <button onclick="submitWorkflowEmergency()" class="btn btn-green btn-full">
+                    Submit Emergency Report
                 </button>
             </div>
 
             <!-- Step 2: After submission -->
             <div id="step-status" class="card" style="display:none">
                 <div class="success-icon">Success</div>
-                <h2>Alert Sent Successfully!</h2>
-                <p id="ambulance-info" class="info-text success-msg">Ambulance assigned and en route</p>
+                <h2>Report Submitted Successfully!</h2>
+                <p id="ambulance-info" class="info-text success-msg">Waiting for admin verification before dispatch</p>
 
                 <div class="status-steps">
                     <div class="step done">Emergency reported</div>
@@ -160,10 +223,60 @@
                 </div>
 
                 <p class="muted" style="text-align: center; margin-top: 1rem;">Emergency ID: <strong id="emergency-id">--</strong></p>
+                <div id="emergency-timeline-panel" class="timeline-panel" style="display:none"></div>
 
                 <button onclick="switchRole('home')" class="btn btn-outline btn-full" style="margin-top:1rem">
                     Back to Home
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Police CCTV Dashboard -->
+    <div id="police-page" class="page-section">
+        <div class="topbar">
+            <button class="back-btn" onclick="switchRole('home')">← Home</button>
+            <span>Police CCTV Control</span>
+        </div>
+
+        <div class="container">
+            <div class="card">
+                <h2>CCTV Accident Verification</h2>
+                <p class="info-text">Internal hackathon demo only. No real police phone number or external alert is used.</p>
+                <div id="police-notifications-list">
+                    <p class="muted">Loading CCTV alerts...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="admin-page" class="page-section">
+        <div class="topbar">
+            <button class="back-btn" onclick="switchRole('home')">← Home</button>
+            <span>Admin Verification</span>
+        </div>
+
+        <div class="container">
+            <div class="card">
+                <h2>Emergency Reports Waiting Review</h2>
+                <p class="info-text">Verify real emergencies before dispatch requests are released to ambulance drivers.</p>
+                <div id="admin-reports-list">
+                    <p class="muted">Loading reports...</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="admin-history-header">
+                    <div>
+                        <h2>All Accident Reports</h2>
+                        <p class="info-text">Complete report history for monitoring, verification, dispatch, and hospital handoff.</p>
+                    </div>
+                    <button class="btn btn-outline" onclick="loadAdminAllReports()">Refresh</button>
+                </div>
+                <div id="admin-all-reports-list">
+                    <p class="muted">Loading report history...</p>
+                </div>
             </div>
         </div>
     </div>
@@ -245,6 +358,14 @@
                 </button>
                 <div id="save-msg" class="success-msg" style="display:none">
                     Updated. Ambulances can now see your status.
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Incoming Emergency Notifications</h2>
+                <p class="info-text">Verified and assigned cases appear here with ambulance and ETA details.</p>
+                <div id="hospital-notifications-list">
+                    <p class="muted">Loading notifications...</p>
                 </div>
             </div>
         </div>
